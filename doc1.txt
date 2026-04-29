@@ -1,0 +1,52 @@
+Category page sourcing and synthesis
+1. Summary
+There are about 500-800 categories that we need to curate
+Every category page is built from the synthesis of multiple SME-authored sources, never a single source. 
+The deliverable per category is a definition that fills five slots:
+Category Definition
+Core capabilities
+Boundaries
+Buyer/use case
+Representative vendors 
+Explicitly flags where the analyst firms disagree about the category's existence, scope, or naming.  
+Two passes per category. 
+First pass casts the net wide using the sources below. 
+Second pass to check for derivative sources, and understand what couldn't be pinned down. 
+2. Source pool
+We treat domain reputation as necessary but not sufficient — sub-paths matter as much as the root domain.
+Glossary. Gartner Glossary. And, what else?
+Analyst firms: Forrester analyst blogs at forrester.com/blogs (especially the author hub pages like forrester.com/blogs/author/{name}/), Gartner analyst blogs at blogs.gartner.com, curated analyst articles at gartner.com/en/articles, Constellation Research blogs and analyst pages at constellationr.com, KuppingerCole research and analyst commentary, Info-Tech analyst content, BARC, HFS Research, Everest Group, Nucleus Research, ISG, Dresner. NIST and ISO standards-body publications for security, identity, and data categories. Personal sites and Substacks of named analysts where they cross-publish.
+TechTarget and similar trade pubs: keep at the byline level only. Articles by recognized SME contributors are useful; staff-writer pieces aren't. Implement at the byline-extraction step, not the domain-allowlist step
+Don’t Use: 
+Review Sites.  G2, TrustRadius, Capterra, Gartner Peer Insights (review platform; category pages contain derived eligibility criteria, not analyst exposition); bylines are content marketers, not Research analysts.
+Vendor sites (including analyst-content excerpts hosted on vendor properties — too much selection bias), class aggregators, SEO tutorial content, LinkedIn aggregator pages, third-party summaries of analyst reports.
+3. Per-category preparation
+Before any sourcing work, decide three things for the category:
+Aliases. Most categories have multiple labels in active use across analyst firms. ABM, Account-Based Marketing, Account-Based Marketing Platforms, ABM platforms, Account-Based Everything, ABX, and Account-Based Experience all refer to overlapping spaces. Sourcing has to gather under all relevant aliases, not just the primary Cuspera label.
+Important. Many categories have a methodology layer and a software layer. For us, the answer is almost always the software layer.
+Maturity tag. Emerging, evolving, or stable. This determines acceptable currency thresholds for sources and sets expectations about how settled the analyst consensus will be.
+4. Source discovery
+Use analyst-firm-restricted searches rather than open web searches, because open results are dominated by the SEO content the filter is supposed to exclude. Site-restricted queries (site:forrester.com/blogs, site:blogs.gartner.com, site:constellationr.com, etc.) per category alias produce a much cleaner candidate set in fewer queries.
+Identify the named analysts covering the category at each major firm — typically two to four people per firm — and crawl their author hub pages directly. The author hub gives you a curated stream of category-relevant content that's more reliable than topic search. For ABM, John Arnold's Forrester author hub is a single-URL goldmine. This pattern generalizes: every analyst firm with public blogs has the equivalent.
+5. Per-source quality assessment
+Score each candidate URL on observable signals rather than holistic vibes. 
+The structural slot-fill: does the source contain a definition, a list of capabilities, boundary content vs. adjacent categories, buyer/use context, named vendors? A source that fills four to five slots cleanly outranks a source that fills two slots beautifully.
+The function-verbs vs. benefit-adjectives signal in capability lists. Real category content uses verbs like "orchestrate," "unify," "score," "route," and "match." SEO content uses adjectives like "better," "smarter," and "faster." This is detectable in the text and is one of the cleanest filters for distinguishing SME content from tutorial fluff.
+Author byline plus author-firm role. For domain-trusted firms (Gartner Research, Forrester analyst blogs, Constellation analysts), the firm's editorial standards mean any byline counts. For permissive domains, the byline has to clear an SME bar — recognized analyst, recognized practitioner-expert, or named contributor with sustained domain focus.
+CategoryCurrency, weighted by category maturity. Six to twelve months for emerging categories; eighteen to twenty-four for evolving; thirty-six-plus for stable.
+Bais Detection: Vendor diversity in named examples. A source that names five or more vendors not in the same corporate family shows range. A source naming only its host vendor or a tight three is a signal of selection bias.
+6. Synthesis
+The synthesized page is written in Cuspera's voice and draws on multiple SME sources. Direct quotation is not allowed both for copyright reasons and because the page should read as Cuspera's editorial work. Multi-source consensus carries the definition; explicit disagreements are surfaced where they exist.
+The five slots get filled in this order: definition, core capabilities, boundaries, buyer/use, and vendors. After the slots, we need to address category drift where applicable: "the boundaries of this category are evolving, with [Firm A] framing it as X and [Firm B] increasingly framing it as Y." This is likely common across hot/new categories.
+For categories where analyst firms genuinely disagree on whether the category exists as a distinct software market — the Constellation-doesn't-have-this-category kind of case — our category page should acknowledge the disagreement directly.
+7. Tier-differentiated handling
+Not all 500–800 categories are the same. Three operating modes:
+Tier A (well-covered by major analysts, roughly 100–150 categories): full multi-source synthesis from Gartner analyst blogs, Forrester analyst blogs, Constellation, plus a second-tier firm where relevant. Currency is rarely an issue. Drift narrative is often the most interesting output.
+Tier B (covered by second-tier analysts or domain-specific firms, roughly 200–300 categories): synthesis primarily from Info-Tech, KuppingerCole, BARC, HFS, or domain-specific publications, supplemented by what little Gartner/Forrester have published openly. Currency requires more attention; the source pool is thinner.
+Tier C (under-covered by any analyst, roughly 100–200 categories): the SME-only filter will produce sparse pages on this tier, and that's the honest outcome of the filter the strategy commits to. 
+For Tier C alone:
+accept thinner pages, with a definition and minimal slot-fill drawn from whatever SME fragments exist
+use the products you've already classified into the category as the implicit definition, with capability commonalities driving the page
+8. Known gaps
+In some cases, the required capability lists for software categories are available only in gated Magic Quadrant or Wave reports. Get help from Preethy/Minu to get these reports. 
+The rubric is heuristic, not algorithmic. The second-pass review is the safety net. After the first 20–30 categories, we need to recalibrate the weights based on what we learn 

@@ -1,0 +1,120 @@
+Authoritative domains for software category definitions
+Organized by category of source, with sub-path notes where relevant. The sub-path discipline matters as much as the domain — as the ABM test showed, the same root domain can host both gold-standard analyst content and review-platform content.
+Major industry analysts (broad coverage)
+Gartner
+blogs.gartner.com — analyst blog network, named bylines
+gartner.com/en/articles — curated articles, including content from acquired firms (TOPO)
+gartner.com/en/sales/glossary, gartner.com/en/marketing/glossary, gartner.com/en/information-technology/glossary, etc. — short canonical entries
+Drop: gartner.com/reviews (Peer Insights), gartner.com/en/digital-markets (Capterra/GetApp/Software Advice)
+Forrester
+forrester.com/blogs and go.forrester.com/blogs — analyst-bylined posts
+forrester.com/blogs/author/{name}/ — per-analyst hubs, the highest-value crawl target
+forrester.com/analyst-bio/ — analyst credentials
+Note: Forrester's free tier is unusually clean; no major review-platform subdivision to filter out
+IDC
+idc.com/getdoc.jsp and idc.com/research — most content gated, but free briefs and press releases occasionally surface category framings
+blogs.idc.com — analyst commentary
+Second-tier independent analysts (often more open)
+Constellation Research — constellationr.com (blogs, ShortLists, analyst pages); typically open access
+Info-Tech Research Group — infotech.com (research notes, blueprints); some content free, some gated; SoftwareReviews is a separate Info-Tech property and is a review platform — drop
+S&P Global Market Intelligence (formerly 451 Research) — 451research.com, spglobal.com/marketintelligence — partial open access
+Omdia (formerly Ovum and Heavy Reading) — omdia.tech.informa.com — partial open access
+HFS Research — hfsresearch.com — strong on services, some open POV content
+ISG (Information Services Group, includes former Ventana Research) — isg-one.com — research notes and free briefs
+Everest Group — everestgrp.com — viewpoint pieces and blog content openly available
+Nucleus Research — nucleusresearch.com — ROI-focused analysis
+Dresner Advisory Services — dresneradvisory.com — strong for BI and analytics categories
+ABI Research — abiresearch.com — IoT, edge, telecom
+GigaOm — gigaom.com — Radar reports, often free; analyst-bylined
+Aragon Research — aragonresearch.com — Globe reports, some open content
+Moor Insights & Strategy — moorinsightsstrategy.com — semiconductors, infrastructure, AI
+Pund-IT — pund-it.com — enterprise IT, AI, cloud
+Enderle Group — enderlegroup.com — practitioner-analyst commentary
+J. Gold Associates — jgoldassociates.com — mobility, enterprise IT
+Domain-specialist analysts (deep in narrow areas)
+KuppingerCole — kuppingercole.com — identity, IAM, security (unusually open with research)
+BARC (Business Application Research Center) — barc.com — data, analytics, BI, EPM
+Coleman Parkes Research — colemanparkes.com — telecom, enterprise IT research
+Pierre Audoin Consultants (PAC, part of teknowlogy) — pac-online.com — European IT services and software
+Frost & Sullivan — frost.com — broad coverage, particularly strong in telecom, healthcare tech, industrial
+EMA (Enterprise Management Associates) — enterprisemanagement.com — IT operations, observability, AIOps
+ESG (Enterprise Strategy Group, now part of TechTarget) — esg-global.com — infrastructure, storage, cybersecurity
+TAG Cyber — tag-cyber.com — security analysis
+Securosis — securosis.com — security research, analyst-bylined
+The Forrester-adjacent practitioner-analysts: Brian Solis (CX), Esteban Kolsky (CX/service), independent Substacks of named analysts who left major firms
+Standards bodies and government sources
+NIST — nist.gov, csrc.nist.gov — Special Publications and frameworks; gold standard for security, identity, cryptography, AI risk
+ISO — iso.org — standards summaries (full standards gated); useful for quality, security, data management category framings
+IEEE — ieee.org, standards.ieee.org — technical standards and definitions
+IETF — ietf.org — networking, internet protocols (RFCs)
+ENISA (European Union Agency for Cybersecurity) — enisa.europa.eu — security category definitions
+CISA — cisa.gov — security categories and frameworks
+MITRE — mitre.org, attack.mitre.org — security frameworks (ATT&CK, D3FEND)
+Cloud Security Alliance — cloudsecurityalliance.org — cloud security category definitions
+OWASP — owasp.org — application security category definitions
+FINOS — finos.org — financial services open source category framings
+FedRAMP — fedramp.gov — cloud service category definitions for government
+HHS / ONC — healthit.gov — health IT category definitions (EHR, HIE, etc.)
+Edited trade publications (byline-level filter required)
+These domains contain both staff-writer SEO content and named SME contributors. The byline does the gating, not the domain.
+TechTarget properties — searchcrm.com, searchsecurity.com, searchnetworking.com, searchstorage.com, searchdatamanagement.com, searcherp.com, searchhrsoftware.com, etc.
+IDG family — cio.com, computerworld.com, infoworld.com, networkworld.com, csoonline.com
+Informa family — darkreading.com, informationweek.com
+The Register — theregister.com — opinionated but often substantively well-informed
+Protocol (archived but still indexed) and successor publications
+The Information — theinformation.com — paid, but bylined SME analysis
+Stratechery — stratechery.com — Ben Thompson; strong for platform and SaaS category framings
+Tom Tunguz — tomtunguz.com — SaaS metrics and category commentary
+Ben Evans — ben-evans.com — platforms, mobile, AI categories
+Scott Brinker / chiefmartec — chiefmartec.com — martech category framings; the Marketing Technology Landscape ("Martech 5000") is widely cited
+MarTech Today / MarTech.org — martech.org — bylined martech analysis
+Adweek, AdExchanger, Digiday — adexchanger.com, digiday.com — adtech and martech categories
+Search Engine Land, Search Engine Journal — searchengineland.com — search and SEO categories (byline-dependent)
+Diginomica — diginomica.com — enterprise software, frequently SME bylines (Den Howlett, Phil Wainewright, Jon Reed)
+ZDNet — zdnet.com — uneven; bylines like Larry Dignan are stronger
+Practitioner-expert and consultancy publications
+McKinsey Insights — mckinsey.com/featured-insights, mckinsey.com/business-functions — strong for category framings tied to business functions
+BCG (Boston Consulting Group) — bcg.com/publications — similar
+Bain & Company — bain.com/insights
+Deloitte Insights — deloitte.com/insights, www2.deloitte.com/insights
+Accenture Research — accenture.com/research
+EY Insights — ey.com/insights
+KPMG Insights — kpmg.com/insights
+PwC Strategy& — strategyand.pwc.com
+a16z (Andreessen Horowitz) — a16z.com — category-creation essays for emerging spaces
+Sequoia Capital — sequoiacap.com/perspective
+Bessemer Venture Partners — bvp.com/atlas — strong for SaaS metrics and category benchmarks
+Battery Ventures — battery.com — software and infrastructure category analysis
+Index Ventures, Accel, NEA, Lightspeed — partner-bylined posts often define emerging categories well
+Academic and research-institution sources
+MIT Sloan Management Review — sloanreview.mit.edu
+Harvard Business Review — hbr.org — strategic and category-defining pieces
+Stanford GSB Insights — gsb.stanford.edu/insights
+Wharton — Knowledge at Wharton — knowledge.wharton.upenn.edu
+MIT CSAIL, Stanford HAI — for AI category definitions specifically
+Gartner-adjacent academic figures — Erik Brynjolfsson, Andrew McAfee, Geoffrey Moore (for category-creation theory itself)
+Industry associations and standards consortia
+Linux Foundation — linuxfoundation.org — open source category framings (CNCF, OpenJS, etc.)
+CNCF (Cloud Native Computing Foundation) — cncf.io — cloud-native category landscape, the CNCF Landscape itself is widely referenced
+Apache Software Foundation — apache.org — project-level definitions
+OASIS — oasis-open.org — standards-based category definitions
+FinOps Foundation — finops.org — FinOps category definitions
+DataOps.live and DataOps community sites — for DataOps category framing
+MACH Alliance — machalliance.org — composable commerce category
+RISE with SAP, OpenAPI Initiative, Open Data Initiative — vendor-led but consortium-shaped
+HFMA, HIMSS — healthcare tech category definitions
+SIIA (Software & Information Industry Association) — siia.net
+Conference and event content (where transcripts and slides exist)
+Useful for category framings that haven't been written up elsewhere; treat as fragmentary SME content.
+RSA Conference and Black Hat archives — security
+AWS re:Invent, Google Cloud Next, Microsoft Ignite — cloud and infrastructure
+Salesforce Dreamforce, HubSpot INBOUND — CRM and martech
+Gartner Symposium and Forrester Summit recap content
+O'Reilly conferences (archived) — emerging technology categories
+Strata Data, MLOps World — data and ML categories
+KubeCon, DevOpsDays — cloud-native and DevOps
+Wikipedia — limited use
+Useful for mature, settled categories with strong citation lists. Quality varies. Not SME-authored in the strict sense (consensus-edited), but the talk page and reference list often surface SME sources Cuspera should crawl directly. Treat Wikipedia as a discovery tool, not a citable source.
+What's deliberately not on this list
+Vendor sites of any kind. G2, TrustRadius, Capterra, GetApp, Software Advice, SourceForge listing pages, Crozdesk, FinancesOnline, GoodFirms, Clutch, and similar review aggregators. Gartner Peer Insights and Gartner Digital Markets specifically (review platforms inside the Gartner brand). SEO-driven "ultimate guide" content regardless of host. LinkedIn aggregator and content-mill posts. Medium posts unless authored by a credentialed SME with a strong track record. Reddit, Hacker News, Stack Exchange — useful for sentiment, not for definitions.
+
