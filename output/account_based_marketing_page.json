@@ -1,0 +1,35 @@
+{
+  "category_name": "Account-Based Marketing",
+  "aliases": [
+    "Account-Based Marketing",
+    "ABM",
+    "Account-Based Marketing Platforms",
+    "ABM platforms",
+    "Account-Based Everything",
+    "ABX",
+    "Account-Based Experience"
+  ],
+  "definition": "Account-Based Marketing (ABM) is a strategic approach in B2B marketing that focuses on targeting specific accounts or buying groups rather than individual leads. This software category enables organizations to design and execute highly personalized marketing campaigns tailored to the unique needs and characteristics of identified accounts, facilitating deeper engagement and alignment between sales and marketing efforts.",
+  "core_capabilities": [
+    "orchestrate",
+    "personalize",
+    "segment",
+    "unify",
+    "automate"
+  ],
+  "boundaries": "ABM platforms are distinct from general Marketing Automation platforms (like Marketo and HubSpot), which primarily focus on lead-level engagement rather than account-level strategies. They also differ from Customer Data Platforms (CDPs) that focus on data unification and customer engagement across all channels without the specific account-centric approach of ABM.",
+  "buyer_use_case": "Typical buyers of ABM software include Chief Marketing Officers (CMOs), Vice Presidents of Demand Generation, and Revenue Marketing leaders in B2B enterprises and mid-market SaaS companies looking to enhance their account targeting and engagement strategies.",
+  "representative_vendors": [
+    "Demandbase",
+    "Terminus",
+    "6sense",
+    "Engagio",
+    "HubSpot",
+    "Marketo",
+    "LinkedIn",
+    "Meta"
+  ],
+  "category_drift": "Forrester frames this as Account-Based Marketing while IDC emphasizes its evolution into a media-driven strategy, highlighting the importance of advertising in modern ABM.",
+  "source_count": 7,
+  "confidence": "high"
+}
