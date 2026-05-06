@@ -5,7 +5,7 @@
     "author": "Kelvin Gee",
     "date": "2024-07-25",
     "hostname": "Forrester",
-    "search_pass": "Tier1",
+    "search_pass": "Tier1-primary",
     "text_length": 5019,
     "score": {
       "slot_definition": true,
@@ -43,7 +43,7 @@
     "author": "Roger Beharry Lall; Martin Herold",
     "date": "2025-11-13",
     "hostname": "IDC",
-    "search_pass": "Tier1",
+    "search_pass": "Tier1-primary",
     "text_length": 7888,
     "score": {
       "slot_definition": true,
@@ -69,13 +69,13 @@
     }
   },
   {
-    "url": "https://www.idc.com/resource-center/blog/accelerate-account-based-marketing-cultivate-clients-with-market-data-as-part-of-your-abm/",
-    "title": "Accelerate Account-Based Marketing: Cultivate Clients with Market Data as Part of Your ABM",
-    "author": "IDC; Martin Herold",
-    "date": "2023-09-29",
-    "hostname": "IDC",
-    "search_pass": "Tier1",
-    "text_length": 4477,
+    "url": "https://www.constellationr.com/research/constellation-shortlist-b2b-marketing-automation-enterprise",
+    "title": "Constellation ShortList™ B2B Marketing Automation for the Enterprise",
+    "author": "Liz Miller",
+    "date": "2025-08-08",
+    "hostname": "Constellationr",
+    "search_pass": "Tier2-key",
+    "text_length": 4383,
     "score": {
       "slot_definition": true,
       "slot_capabilities": true,
@@ -86,17 +86,17 @@
       "uses_function_verbs": true,
       "vendor_count": 5,
       "vendor_names": [
-        "Cazoo",
-        "Oasis Fashions",
-        "Papa John’s International",
-        "XPO Logistics",
-        "A.P. Moller-Maersk"
+        "Salesforce",
+        "HubSpot",
+        "Marketo",
+        "Pardot",
+        "Oracle"
       ],
       "is_sme_content": true,
       "byline_quality": "named_author",
       "single_vendor_bias": false,
       "relevance_score": 9,
-      "reasoning": "The source provides a clear definition of Account-Based Marketing, outlines core capabilities, distinguishes it from adjacent categories, describes buyer personas, and names multiple distinct vendors. It uses expert verbs and is authored by a recognized entity, making it highly relevant for defining the category."
+      "reasoning": "The source provides a comprehensive definition of B2B marketing automation, lists core capabilities, distinguishes it from adjacent categories like traditional marketing, describes the buyer persona, and names multiple vendors. It uses expert verbs and is authored by a recognized expert, making it highly relevant for defining the software category."
     }
   },
   {
@@ -105,7 +105,7 @@
     "author": "Nora Conklin",
     "date": "2025-03-04",
     "hostname": "Forrester",
-    "search_pass": "Tier1",
+    "search_pass": "Tier1-primary",
     "text_length": 670,
     "score": {
       "slot_definition": true,
@@ -125,53 +125,30 @@
     }
   },
   {
-    "url": "https://www.forrester.com/report/establishing-an-account-based-marketing-charter/RES173029",
-    "title": "Establishing An Account-Based Marketing Charter | Forrester",
-    "author": "Nora Conklin",
-    "date": "2025-04-03",
+    "url": "https://www.forrester.com/report/aveva-scaling-account-based-marketing-to-drive-customer-centric-growth/RES191150",
+    "title": "AVEVA: Scaling Account-Based Marketing To Drive Customer-Centric Growth | Forrester",
+    "author": "Conrad Mills",
+    "date": "2026-01-29",
     "hostname": "Forrester",
-    "search_pass": "Tier1",
-    "text_length": 358,
+    "search_pass": "Tier1-primary",
+    "text_length": 687,
     "score": {
       "slot_definition": true,
       "slot_capabilities": true,
       "slot_boundaries": true,
       "slot_buyer_use": true,
-      "slot_vendors": false,
-      "slots_filled": 4,
+      "slot_vendors": true,
+      "slots_filled": 5,
       "uses_function_verbs": true,
-      "vendor_count": 0,
-      "vendor_names": [],
+      "vendor_count": 1,
+      "vendor_names": [
+        "AVEVA"
+      ],
       "is_sme_content": true,
       "byline_quality": "named_author",
-      "single_vendor_bias": false,
+      "single_vendor_bias": true,
       "relevance_score": 8,
-      "reasoning": "The source provides a clear definition of an ABM charter, outlines core capabilities, distinguishes it from adjacent categories, and describes the buyer persona/use case. It uses expert verbs and is authored by a named author, indicating a level of expertise. However, it does not mention any distinct vendors, which slightly limits its comprehensiveness."
-    }
-  },
-  {
-    "url": "https://www.idc.com/resource-center/blog/gain-share-with-account-based-marketing-focus-on-target-accounts-to-grow-your-business/",
-    "title": "Accelerate Account-Based Marketing: Orient Your Strategy with Competitor Intelligence",
-    "author": "IDC; Martin Herold",
-    "date": "2023-08-18",
-    "hostname": "IDC",
-    "search_pass": "Tier1",
-    "text_length": 5640,
-    "score": {
-      "slot_definition": true,
-      "slot_capabilities": true,
-      "slot_boundaries": true,
-      "slot_buyer_use": true,
-      "slot_vendors": false,
-      "slots_filled": 4,
-      "uses_function_verbs": true,
-      "vendor_count": 0,
-      "vendor_names": [],
-      "is_sme_content": true,
-      "byline_quality": "named_author",
-      "single_vendor_bias": false,
-      "relevance_score": 8,
-      "reasoning": "The source provides a clear definition of Account-Based Marketing, outlines core capabilities, distinguishes it from adjacent categories, and describes buyer personas. It uses expert verbs and is authored by a recognized entity (IDC), indicating a level of expertise. However, it does not name any specific vendors, which slightly limits its comprehensiveness."
+      "reasoning": "The source provides a clear definition of account-based marketing, outlines core capabilities, distinguishes it from adjacent categories, describes the buyer persona, and names a representative vendor (AVEVA). It uses expert verbs and is authored by a named author, indicating some level of expertise. However, it primarily focuses on a single vendor, which introduces some bias."
     }
   },
   {
@@ -180,7 +157,7 @@
     "author": "Tapan Patel; Martin Herold",
     "date": "2025-01-13",
     "hostname": "IDC",
-    "search_pass": "Tier1",
+    "search_pass": "Tier1-primary",
     "text_length": 7860,
     "score": {
       "slot_definition": true,
@@ -200,37 +177,12 @@
     }
   },
   {
-    "url": "https://www.forrester.com/blogs/category/account-based-marketing-abm/",
-    "title": "Account-Based Marketing (ABM) Archives",
-    "author": "Matthew Selheimer",
-    "date": "2026-04-02",
-    "hostname": "Forrester",
-    "search_pass": "Tier1",
-    "text_length": 6132,
-    "score": {
-      "slot_definition": true,
-      "slot_capabilities": false,
-      "slot_boundaries": false,
-      "slot_buyer_use": false,
-      "slot_vendors": false,
-      "slots_filled": 1,
-      "uses_function_verbs": false,
-      "vendor_count": 0,
-      "vendor_names": [],
-      "is_sme_content": false,
-      "byline_quality": "named_author",
-      "single_vendor_bias": false,
-      "relevance_score": 4,
-      "reasoning": "The source provides a definition of Account-Based Marketing (ABM) but lacks detailed core capabilities, boundaries, buyer personas, and representative vendors. It uses general language rather than expert verbs, and while authored by a named author, it does not appear to be in-depth expert content. The relevance score reflects its limited utility for defining the software category."
-    }
-  },
-  {
     "url": "https://www.idc.com/eu/promo/boost-your-roi-with-data-driven-account-based-marketing/",
     "title": "IDC - Boost Your ROI with Data-Driven Account-Based Marketing - Home",
     "author": null,
     "date": "2025-08-07",
     "hostname": "IDC",
-    "search_pass": "Tier1",
+    "search_pass": "Tier1-primary",
     "text_length": 997,
     "score": {
       "slot_definition": true,
@@ -250,38 +202,67 @@
     }
   },
   {
-    "url": "https://research.isg-one.com/white_paper/data/using_external_data_to_enhance_market_segmentation",
-    "title": "Using External Data to Enhance Market Segmentation Research Perspective",
-    "author": null,
-    "date": "2026-01-01",
-    "hostname": "research.isg-one.com",
-    "search_pass": "Tier2-key",
-    "text_length": 1391,
+    "url": "https://www.forrester.com/blogs/the-95-5-rule-is-not-a-rule-but-its-not-a-myth-either/",
+    "title": "The 95-5 Rule Is Not A Rule, But It’s Not A Myth Either",
+    "author": "John Arnold",
+    "date": "2025-05-12",
+    "hostname": "Forrester",
+    "search_pass": "Tier1-secondary",
+    "text_length": 3739,
     "score": {
       "slot_definition": false,
       "slot_capabilities": false,
       "slot_boundaries": false,
-      "slot_buyer_use": true,
-      "slot_vendors": false,
+      "slot_buyer_use": false,
+      "slot_vendors": true,
       "slots_filled": 1,
       "uses_function_verbs": false,
+      "vendor_count": 3,
+      "vendor_names": [
+        "B2B marketing technology",
+        "account-based marketing platforms",
+        "B2B data providers"
+      ],
+      "is_sme_content": true,
+      "byline_quality": "named_author",
+      "single_vendor_bias": false,
+      "relevance_score": 4,
+      "reasoning": "The source provides some insights into B2B marketing technology and mentions a few relevant vendors, but it lacks a clear definition of Account-Based Marketing, core capabilities, and buyer personas. It is more of an opinion piece than a comprehensive analysis, which limits its usefulness for defining the category."
+    }
+  },
+  {
+    "url": "https://www.idc.com/resource-center/blog/the-future-of-ai-is-model-routing/",
+    "title": "The future of AI is model routing",
+    "author": "Neil Ward-Dutton; Apambid",
+    "date": "2025-11-17",
+    "hostname": "IDC",
+    "search_pass": "Tier1-secondary",
+    "text_length": 4835,
+    "score": {
+      "slot_definition": false,
+      "slot_capabilities": false,
+      "slot_boundaries": false,
+      "slot_buyer_use": false,
+      "slot_vendors": false,
+      "slots_filled": 0,
+      "uses_function_verbs": true,
       "vendor_count": 0,
       "vendor_names": [],
-      "is_sme_content": false,
-      "byline_quality": "no_byline",
+      "is_sme_content": true,
+      "byline_quality": "named_author",
       "single_vendor_bias": false,
       "relevance_score": 3,
-      "reasoning": "The source provides a limited perspective on account-based marketing, focusing primarily on customer segmentation without a clear definition or comprehensive coverage of core capabilities, boundaries, or vendor information. It does mention a use case but lacks depth and expert analysis, making it less useful for defining the software category."
+      "reasoning": "The article discusses AI model routing but does not define Account-Based Marketing or provide relevant details about its capabilities, boundaries, or vendors. It uses some expert verbs but lacks depth in the specific category of Account-Based Marketing."
     }
   },
   {
-    "url": "https://www.forrester.com/blogs/author/jessie_johnson/",
-    "title": "Jessie Johnson",
-    "author": "Jessie Johnson",
-    "date": "2026-03-10",
-    "hostname": "Forrester",
-    "search_pass": "AnalystHub",
-    "text_length": 7573,
+    "url": "https://www.idc.com/resource-center/blog/the-ai-experience-era-the-next-decade-of-tech-marketing/",
+    "title": "The AI Experience Era: The Next Decade of Tech Marketing",
+    "author": "Laurie Buczek; Martin Herold",
+    "date": "2025-02-24",
+    "hostname": "IDC",
+    "search_pass": "Tier1-primary",
+    "text_length": 6502,
     "score": {
       "slot_definition": false,
       "slot_capabilities": false,
@@ -296,17 +277,17 @@
       "byline_quality": "named_author",
       "single_vendor_bias": false,
       "relevance_score": 2,
-      "reasoning": "The source does not provide a definition, core capabilities, boundaries, buyer use cases, or representative vendors for Account-Based Marketing. It appears to be more focused on general B2B marketing trends and AI rather than specifically addressing the software category in question."
+      "reasoning": "The source does not provide a definition of Account-Based Marketing, nor does it list core capabilities, boundaries, buyer personas, or representative vendors. It discusses broader marketing trends and the impact of AI but lacks specific relevance to the category. The content appears more promotional and lacks depth in analysis."
     }
   },
   {
-    "url": "https://www.forrester.com/blogs/author/terry_flaherty/",
-    "title": "Terry Flaherty",
-    "author": "Terry Flaherty",
-    "date": "2026-04-02",
-    "hostname": "Forrester",
-    "search_pass": "AnalystHub",
-    "text_length": 5853,
+    "url": "https://www.idc.com/resource-center/blog/the-ai-homework-nobody-asked-for-but-everyones-getting-anyway/",
+    "title": "The AI homework nobody asked for (but everyone’s getting anyway)",
+    "author": "Ewa Zborowska; Martin Herold",
+    "date": "2025-11-03",
+    "hostname": "IDC",
+    "search_pass": "Tier1-secondary",
+    "text_length": 7892,
     "score": {
       "slot_definition": false,
       "slot_capabilities": false,
@@ -321,17 +302,17 @@
       "byline_quality": "named_author",
       "single_vendor_bias": false,
       "relevance_score": 2,
-      "reasoning": "The source does not provide a definition, core capabilities, boundaries, buyer use cases, or representative vendors for Account-Based Marketing. It primarily discusses MQLs and buying groups without delving into the specifics of the software category. While the author is a named analyst, the content lacks depth and appears more promotional than analytical."
+      "reasoning": "The source does not provide a definition, core capabilities, boundaries, buyer use cases, or representative vendors for Account-Based Marketing. It discusses AI in a general context without specific relevance to the category. The content lacks expert verbs and appears more like a commentary than an analytical piece. The byline is from named authors but not recognized analysts, and there are no vendors mentioned."
     }
   },
   {
-    "url": "https://research.isg-one.com/analyst-perspectives/topic/intelligent-marketing",
-    "title": "ISG Software Research Analyst Perspectives | intelligent marketing",
-    "author": "Keith Dawson",
-    "date": "2024-02-05",
-    "hostname": "Ventanaresearch",
-    "search_pass": "AnalystHub",
-    "text_length": 408,
+    "url": "https://www.idc.com/resource-center/blog/q1-is-not-a-test-run-its-a-commitment/",
+    "title": "Q1 is not a test run. It’s a commitment.",
+    "author": "Christina Cardoza",
+    "date": "2026-01-22",
+    "hostname": "IDC",
+    "search_pass": "Tier1-secondary",
+    "text_length": 5326,
     "score": {
       "slot_definition": false,
       "slot_capabilities": false,
@@ -346,17 +327,42 @@
       "byline_quality": "named_author",
       "single_vendor_bias": false,
       "relevance_score": 2,
-      "reasoning": "The source does not provide a definition, core capabilities, boundaries, buyer use cases, or vendor names related to Account-Based Marketing. It lacks expert verbs and appears to be more promotional than analytical. The author is named but not a recognized analyst, and there are no distinct vendors mentioned."
+      "reasoning": "The source does not provide a definition of Account-Based Marketing, core capabilities, boundaries, buyer use cases, or representative vendors. It lacks expert verbs and appears to be more of a commentary than an analytical piece. The author is named but not a recognized analyst, and there are no vendors mentioned."
     }
   },
   {
-    "url": "https://www.idc.com/resource-center/blog/resource-region/3_223/page/9/",
-    "title": "Central and Eastern Europe Archives",
-    "author": null,
-    "date": "2025-09-24",
+    "url": "https://www.idc.com/resource-center/blog/your-next-move-why-its-time-to-capitalize-on-marketing-your-ai/",
+    "title": "Your Next Move: It’s Time to Capitalize on Marketing Your AI",
+    "author": "Ryan Smith; Martin Herold",
+    "date": "2025-06-13",
     "hostname": "IDC",
-    "search_pass": "Tier1",
-    "text_length": 6525,
+    "search_pass": "Tier1-secondary",
+    "text_length": 6973,
+    "score": {
+      "slot_definition": false,
+      "slot_capabilities": false,
+      "slot_boundaries": false,
+      "slot_buyer_use": false,
+      "slot_vendors": false,
+      "slots_filled": 0,
+      "uses_function_verbs": false,
+      "vendor_count": 0,
+      "vendor_names": [],
+      "is_sme_content": false,
+      "byline_quality": "named_author",
+      "single_vendor_bias": false,
+      "relevance_score": 2,
+      "reasoning": "The source does not provide a definition of Account-Based Marketing, nor does it list core capabilities, boundaries, buyer personas, or representative vendors. It focuses on AI marketing strategies without addressing the specific software category in question. The content lacks depth and appears more promotional than analytical."
+    }
+  },
+  {
+    "url": "https://www.idc.com/help/helpmyidc/",
+    "title": "MyIDC",
+    "author": null,
+    "date": "2025-08-07",
+    "hostname": "IDC",
+    "search_pass": "Tier1-secondary",
+    "text_length": 12526,
     "score": {
       "slot_definition": false,
       "slot_capabilities": false,
@@ -371,17 +377,42 @@
       "byline_quality": "no_byline",
       "single_vendor_bias": false,
       "relevance_score": 1,
-      "reasoning": "The source does not provide a definition of Account-Based Marketing, nor does it list core capabilities, boundaries, buyer personas, or representative vendors. It lacks expert content and uses no function verbs, making it irrelevant for defining the software category."
+      "reasoning": "The content is primarily a user guide for the myIDC platform and does not provide any information relevant to defining the software category 'Account-Based Marketing'. It lacks a definition, core capabilities, boundaries, buyer use cases, and vendor mentions."
     }
   },
   {
-    "url": "https://www.idc.com/page/16/?keywords&utm_source&pg=1&direction=ASC&facetcountry=cn&facetcategory=entry%20level&facetcity=guangzhou&pagenumber=1&orderby=-company",
-    "title": "Lianfeng Wu - Vice President - IDC",
-    "author": null,
-    "date": "2026-01-01",
+    "url": "https://www.idc.com/resource-center/blog/the-knowledge-your-ai-may-never-have/",
+    "title": "The knowledge your AI may never have",
+    "author": "Ewa Zborowska; Roman Kropyva",
+    "date": "2026-03-09",
     "hostname": "IDC",
-    "search_pass": "Tier1",
-    "text_length": 2187,
+    "search_pass": "Tier1-secondary",
+    "text_length": 9319,
+    "score": {
+      "slot_definition": false,
+      "slot_capabilities": false,
+      "slot_boundaries": false,
+      "slot_buyer_use": false,
+      "slot_vendors": false,
+      "slots_filled": 0,
+      "uses_function_verbs": false,
+      "vendor_count": 0,
+      "vendor_names": [],
+      "is_sme_content": false,
+      "byline_quality": "named_author",
+      "single_vendor_bias": false,
+      "relevance_score": 1,
+      "reasoning": "The source does not provide a definition of Account-Based Marketing, nor does it cover core capabilities, boundaries, buyer personas, or representative vendors. The content is more focused on AI and data issues rather than marketing strategies. It lacks expert verbs and appears to be more of a general commentary than a specialized analysis."
+    }
+  },
+  {
+    "url": "https://aragonresearch.com/digital-marketing/",
+    "title": "Digital Marketing",
+    "author": null,
+    "date": "2024-10-11",
+    "hostname": "Aragon Research",
+    "search_pass": "Tier2-key",
+    "text_length": 593,
     "score": {
       "slot_definition": false,
       "slot_capabilities": false,
@@ -396,32 +427,7 @@
       "byline_quality": "no_byline",
       "single_vendor_bias": false,
       "relevance_score": 1,
-      "reasoning": "The source does not provide a definition of Account-Based Marketing, core capabilities, boundaries, buyer use cases, or representative vendors. It lacks expert verbs and is authored by an unknown individual, indicating a lack of credibility. Overall, it is not relevant for defining the software category."
-    }
-  },
-  {
-    "url": "https://www.idc.com/page/13/?keywords&utm_source&pg=1&direction=ASC&facetcountry=cn&facetcategory=entry%20level&facetcity=guangzhou&pagenumber=1&orderby=-company",
-    "title": "Manoj Vallikkat - Senior Research Manager - IDC",
-    "author": null,
-    "date": "2026-01-01",
-    "hostname": "IDC",
-    "search_pass": "Tier1",
-    "text_length": 9342,
-    "score": {
-      "slot_definition": false,
-      "slot_capabilities": false,
-      "slot_boundaries": false,
-      "slot_buyer_use": false,
-      "slot_vendors": false,
-      "slots_filled": 0,
-      "uses_function_verbs": false,
-      "vendor_count": 0,
-      "vendor_names": [],
-      "is_sme_content": false,
-      "byline_quality": "no_byline",
-      "single_vendor_bias": false,
-      "relevance_score": 1,
-      "reasoning": "The source does not provide a definition of Account-Based Marketing, nor does it list core capabilities, boundaries, buyer personas, or representative vendors. It lacks expert content and uses no function verbs, making it irrelevant for defining the software category."
+      "reasoning": "The source does not provide any definition, capabilities, boundaries, buyer use cases, or vendor names related to Account-Based Marketing. It lacks expert content and has no identifiable author, making it unsuitable for defining the software category."
     }
   }
 ]
