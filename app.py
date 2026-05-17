@@ -95,14 +95,26 @@ if config_response.status_code == 200:
         help="Enter category aliases, one per line or separated by commas. First 2 will be used for focused search, rest for secondary search."
     )
     
+    # Analyst Hub URLs input
+    current_hub_urls = config.get("analyst_hub_urls", [])
+    hub_urls_text = st.sidebar.text_area(
+        "Analyst Hub URLs (one per line)",
+        value="\n".join(current_hub_urls) if current_hub_urls else "",
+        height=100,
+        help="Enter analyst hub URLs to include in Pass 0 search, one per line"
+    )
+    
     if st.sidebar.button("Update Configuration"):
         # Parse aliases from text area (split by newlines or commas)
         parsed_aliases = [alias.strip() for alias in aliases_text.replace(",", "\n").split("\n") if alias.strip()]
+        # Parse hub URLs from text area (split by newlines)
+        parsed_hub_urls = [url.strip() for url in hub_urls_text.split("\n") if url.strip()]
         requests.post(f"{API_BASE}/config", json={
             "category": category,
             "maturity": maturity,
             "aliases": parsed_aliases,
-            "max_source_age_months": max_age
+            "max_source_age_months": max_age,
+            "analyst_hub_urls": parsed_hub_urls
         })
         st.sidebar.success("Configuration updated!")
 
@@ -113,6 +125,19 @@ if cache_response.status_code == 200:
     cache_stats = cache_response.json()
     for namespace, count in cache_stats.items():
         st.sidebar.metric(namespace, count)
+
+st.sidebar.markdown("**Clear Cache:**")
+col1, col2 = st.sidebar.columns(2)
+with col1:
+    if st.button("🗑️ LLM", help="Clear LLM scoring cache only"):
+        requests.delete(f"{API_BASE}/cache", params={"namespace": "llm_scoring"})
+        st.sidebar.success("LLM cache cleared!")
+        st.rerun()
+with col2:
+    if st.button("🗑️ All", help="Clear all cache"):
+        requests.delete(f"{API_BASE}/cache")
+        st.sidebar.success("All cache cleared!")
+        st.rerun()
 
 st.sidebar.markdown("---")
 st.sidebar.header("Navigation")
@@ -257,6 +282,7 @@ if st.session_state.workflow_step >= 3:
             st.markdown(f"""
             **#{i+1} - Relevance: {sc['relevance_score']}/10 | Slots: {sc['slots_filled']}/5 | Vendors: {sc['vendor_count']}**
             - **Title:** {s['title']}
+            - **URL:** {s['url']}
             - **Author:** {s['author'] or 'n/a'}
             - **Date:** {s['date'] or 'n/a'}
             - **Host:** {s['hostname']}
@@ -301,6 +327,27 @@ if st.session_state.workflow_step >= 4:
         st.markdown(f"### {synthesis['category_name']}")
         st.markdown(f"**Aliases:** {', '.join(synthesis['aliases'])}")
         st.markdown(f"**Confidence:** {synthesis['confidence']} | **Sources:** {synthesis['source_count']}")
+        
+        # Display source links
+        st.markdown("---")
+        st.markdown("### Source Links Used")
+        if st.session_state.score_results:
+            top_sources = [
+                item for item in st.session_state.score_results['scored_sources']
+                if item['score']['relevance_score'] >= 5
+                and item['score']['slots_filled'] >= 2
+                and not item['score']['single_vendor_bias']
+            ]
+            if len(top_sources) < 3:
+                top_sources = [
+                    item for item in st.session_state.score_results['scored_sources']
+                    if item['score']['relevance_score'] >= 5
+                    and item['score']['slots_filled'] >= 2
+                ]
+            for i, item in enumerate(top_sources[:5]):
+                s = item['source']
+                sc = item['score']
+                st.markdown(f"**{i+1}.** [{s['title']}]({s['url']}) - Relevance: {sc['relevance_score']}/10")
         
         st.markdown("---")
         

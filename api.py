@@ -148,6 +148,7 @@ class CategoryConfig(BaseModel):
     maturity: str = CATEGORY_MATURITY
     aliases: List[str] = CATEGORY_ALIASES
     max_source_age_months: int = MAX_SOURCE_AGE_MONTHS
+    analyst_hub_urls: List[str] = ANALYST_HUB_URLS
 
 class SearchResult(BaseModel):
     url: str
@@ -378,17 +379,19 @@ async def get_config():
         "aliases": config.aliases,
         "max_source_age_months": config.max_source_age_months,
         "focused_aliases": FOCUSED_ALIASES,
-        "secondary_aliases": SECONDARY_ALIASES
+        "secondary_aliases": SECONDARY_ALIASES,
+        "analyst_hub_urls": ANALYST_HUB_URLS
     }
 
 @app.post("/config")
 async def update_config(config: CategoryConfig):
     """Update category configuration"""
-    global TEST_CATEGORY, CATEGORY_MATURITY, CATEGORY_ALIASES, MAX_SOURCE_AGE_MONTHS, FOCUSED_ALIASES, SECONDARY_ALIASES
+    global TEST_CATEGORY, CATEGORY_MATURITY, CATEGORY_ALIASES, MAX_SOURCE_AGE_MONTHS, FOCUSED_ALIASES, SECONDARY_ALIASES, ANALYST_HUB_URLS
     TEST_CATEGORY = config.category
     CATEGORY_MATURITY = config.maturity
     CATEGORY_ALIASES = config.aliases
     MAX_SOURCE_AGE_MONTHS = config.max_source_age_months
+    ANALYST_HUB_URLS = config.analyst_hub_urls
     
     # Split aliases into focused (first 2) and secondary (remaining)
     if len(CATEGORY_ALIASES) >= 2:
@@ -406,7 +409,30 @@ async def update_config(config: CategoryConfig):
 @app.get("/cache/stats")
 async def get_cache_stats():
     """Get cache statistics"""
-    return cache_stats()
+    stats = {}
+    for namespace in os.listdir(CACHE_DIR):
+        namespace_path = os.path.join(CACHE_DIR, namespace)
+        if os.path.isdir(namespace_path):
+            stats[namespace] = len([f for f in os.listdir(namespace_path) if f.endswith('.json')])
+    return stats
+
+@app.delete("/cache")
+async def clear_cache(namespace: str = None):
+    """Clear cache - optionally clear only specific namespace"""
+    import shutil
+    if namespace:
+        # Clear only specific namespace
+        namespace_path = os.path.join(CACHE_DIR, namespace)
+        if os.path.exists(namespace_path):
+            shutil.rmtree(namespace_path)
+            os.makedirs(namespace_path)
+        return {"message": f"Cache cleared for namespace: {namespace}"}
+    else:
+        # Clear all cache
+        if os.path.exists(CACHE_DIR):
+            shutil.rmtree(CACHE_DIR)
+            os.makedirs(CACHE_DIR)
+        return {"message": "All cache cleared"}
 
 @app.post("/search")
 async def search_sources():
@@ -586,7 +612,7 @@ Score it on these criteria:
 1. SLOT-FILL: Does it contain (a) a definition, (b) core capabilities, (c) boundaries vs adjacent categories, (d) buyer/use case, (e) representative vendors? Count how many of these 5 slots it fills.
 2. FUNCTION-VERBS: Does it use expert verbs (orchestrate, unify, score, route, match, segment, personalize, align) rather than SEO adjectives?
 3. BYLINE QUALITY: Evaluate the author byline - "named_analyst", "named_author", or "no_byline".
-4. VENDOR DIVERSITY: How many distinct vendors are named? List them.
+4. VENDOR DIVERSITY: How many distinct vendors are named? CRITICAL: Extract ACTUAL vendor/product names from the content. Look for company names like "Salesforce", "HubSpot", "Adobe", "Marketo", "6sense", "Demandbase", etc. Do NOT use placeholders like "Vendor 1, Vendor 2". If the text mentions specific companies, list their exact names. If no vendors are mentioned, return an empty list []. Examples of correct output: ["Salesforce", "HubSpot", "Adobe"] or [] if none found.
 5. SME CONTENT: Is this analyst/expert content or marketing fluff?
 6. RELEVANCE: How useful is this source (1-10)?
 
