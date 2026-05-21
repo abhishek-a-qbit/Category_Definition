@@ -88,14 +88,6 @@ KEY_TIER2_SITES = [
     "aragonresearch.com",
 ]
 
-ANALYST_HUB_URLS = [
-    "https://www.forrester.com/blogs/author/john_arnold/",
-    "https://www.forrester.com/blogs/author/jessie_johnson/",
-    "https://www.forrester.com/blogs/author/terry_flaherty/",
-    "https://www.gartner.com/en/articles/the-account-based-everything-framework",
-    "https://research.isg-one.com/analyst-perspectives/topic/intelligent-marketing",
-]
-
 DROP_URL_PATTERNS = [
     "/software-reviews/",
     "/compare/",
@@ -148,7 +140,6 @@ class CategoryConfig(BaseModel):
     maturity: str = CATEGORY_MATURITY
     aliases: List[str] = CATEGORY_ALIASES
     max_source_age_months: int = MAX_SOURCE_AGE_MONTHS
-    analyst_hub_urls: List[str] = ANALYST_HUB_URLS
 
 class SearchResult(BaseModel):
     url: str
@@ -379,19 +370,17 @@ async def get_config():
         "aliases": config.aliases,
         "max_source_age_months": config.max_source_age_months,
         "focused_aliases": FOCUSED_ALIASES,
-        "secondary_aliases": SECONDARY_ALIASES,
-        "analyst_hub_urls": ANALYST_HUB_URLS
+        "secondary_aliases": SECONDARY_ALIASES
     }
 
 @app.post("/config")
 async def update_config(config: CategoryConfig):
     """Update category configuration"""
-    global TEST_CATEGORY, CATEGORY_MATURITY, CATEGORY_ALIASES, MAX_SOURCE_AGE_MONTHS, FOCUSED_ALIASES, SECONDARY_ALIASES, ANALYST_HUB_URLS
+    global TEST_CATEGORY, CATEGORY_MATURITY, CATEGORY_ALIASES, MAX_SOURCE_AGE_MONTHS, FOCUSED_ALIASES, SECONDARY_ALIASES
     TEST_CATEGORY = config.category
     CATEGORY_MATURITY = config.maturity
     CATEGORY_ALIASES = config.aliases
     MAX_SOURCE_AGE_MONTHS = config.max_source_age_months
-    ANALYST_HUB_URLS = config.analyst_hub_urls
     
     # Split aliases into focused (first 2) and secondary (remaining)
     if len(CATEGORY_ALIASES) >= 2:
@@ -440,18 +429,6 @@ async def search_sources():
     seen_urls = set()
     all_results = []
     total_queries = 0
-    
-    # Pass 0: Analyst hub URLs
-    for hub_url in ANALYST_HUB_URLS:
-        if hub_url not in seen_urls and not url_is_blocked(hub_url):
-            seen_urls.add(hub_url)
-            all_results.append({
-                "url": hub_url,
-                "title": f"[Hub] {hub_url.split('/')[-2] if hub_url.endswith('/') else hub_url.split('/')[-1]}",
-                "snippet": "",
-                "query_alias": TEST_CATEGORY,
-                "search_pass": "AnalystHub",
-            })
     
     # Pass 1: Tier 1 primary aliases
     def run_search_pass(name: str, sites: List[str], aliases: List[str], batch_size: int, num_per_query: int = 6):

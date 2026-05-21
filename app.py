@@ -63,6 +63,8 @@ if 'score_results' not in st.session_state:
     st.session_state.score_results = None
 if 'synthesis_results' not in st.session_state:
     st.session_state.synthesis_results = None
+if 'evaluation_results' not in st.session_state:
+    st.session_state.evaluation_results = None
 
 # Sidebar
 st.sidebar.title("📊 Category Definition")
@@ -95,26 +97,14 @@ if config_response.status_code == 200:
         help="Enter category aliases, one per line or separated by commas. First 2 will be used for focused search, rest for secondary search."
     )
     
-    # Analyst Hub URLs input
-    current_hub_urls = config.get("analyst_hub_urls", [])
-    hub_urls_text = st.sidebar.text_area(
-        "Analyst Hub URLs (one per line)",
-        value="\n".join(current_hub_urls) if current_hub_urls else "",
-        height=100,
-        help="Enter analyst hub URLs to include in Pass 0 search, one per line"
-    )
-    
     if st.sidebar.button("Update Configuration"):
         # Parse aliases from text area (split by newlines or commas)
         parsed_aliases = [alias.strip() for alias in aliases_text.replace(",", "\n").split("\n") if alias.strip()]
-        # Parse hub URLs from text area (split by newlines)
-        parsed_hub_urls = [url.strip() for url in hub_urls_text.split("\n") if url.strip()]
         requests.post(f"{API_BASE}/config", json={
             "category": category,
             "maturity": maturity,
             "aliases": parsed_aliases,
             "max_source_age_months": max_age,
-            "analyst_hub_urls": parsed_hub_urls
         })
         st.sidebar.success("Configuration updated!")
 
@@ -178,7 +168,7 @@ if st.session_state.workflow_step >= 0:
         st.markdown(f'<div class="success-box">✅ Search complete: {results["total_queries"]} queries → {results["total_urls"]} URLs found</div>', unsafe_allow_html=True)
         
         with st.expander("View Search Results"):
-            for i, result in enumerate(results["results"][:20]):
+            for i, result in enumerate(results["results"]):
                 st.markdown(f"""
                 **{i+1}. [{result['search_pass']}] {result['title']}**
                 - URL: {result['url']}
@@ -220,6 +210,11 @@ if st.session_state.workflow_step >= 1:
             for item in results['pre_scrape_details']:
                 st.markdown(f"✗ **{item['reason']}:** {item['title'][:60]}")
                 st.text(item['url'])
+        
+        with st.expander("View Successfully Scraped URLs"):
+            for i, item in enumerate(results['scraped_sources']):
+                st.markdown(f"**{i+1}.** [{item['title']}]({item['url']})")
+                st.caption(f"Alias: {item['query_alias']} | Pass: {item['search_pass']}")
         
         with st.expander("View Post-scrape Failures"):
             for item in results['scrape_failures']:
@@ -373,11 +368,119 @@ if st.session_state.workflow_step >= 4:
         
         with st.expander("View Raw Synthesis JSON"):
             st.json(synthesis)
+        
+        # Evaluation section
+        st.markdown("---")
+        st.markdown('<div class="step-header"><h2>Step 6: Evaluate Synthesis Quality</h2></div>', unsafe_allow_html=True)
+        
+        if st.button("📊 Run Evaluation", key="eval_btn"):
+            with st.spinner("Evaluating synthesis quality..."):
+                try:
+                    # Import and use the evaluator
+                    import sys
+                    sys.path.append('.')
+                    from ai import evaluate_synthesis
+                    
+                    # Extract source content from scored sources that were used in synthesis
+                    source_content = []
+                    if st.session_state.score_results:
+                        scored_sources = st.session_state.score_results.get('scored_sources', [])
+                        # Get sources that were actually used in synthesis (high quality)
+                        top_sources = [
+                            item for item in scored_sources
+                            if item["score"]["relevance_score"] >= 5
+                            and item["score"]["slots_filled"] >= 2
+                            and not item["score"]["single_vendor_bias"]
+                        ]
+                        if len(top_sources) < 3:
+                            top_sources = [
+                                item for item in scored_sources
+                                if item["score"]["relevance_score"] >= 5
+                                and item["score"]["slots_filled"] >= 2
+                            ]
+                        # Convert to the format expected by evaluator (url, title, text)
+                        for item in top_sources[:5]:  # Limit to top 5 sources
+                            source = item["source"]
+                            source_content.append({
+                                "url": source.get("url", ""),
+                                "title": source.get("title", ""),
+                                "text": source.get("text", "")[:2000]  # Limit text length
+                            })
+                    
+                    evaluation_results = evaluate_synthesis(synthesis, synthesis['category_name'], source_content)
+                    st.session_state.evaluation_results = evaluation_results
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Evaluation failed: {str(e)}")
+        
+        if st.session_state.evaluation_results:
+            results = st.session_state.evaluation_results
+            
+            if 'error' in results:
+                st.markdown(f'''
+                <div class="warning-box">
+                    ⚠️ Evaluation completed with warnings: {results["error"]}
+                </div>
+                ''', unsafe_allow_html=True)
+            else:
+                st.markdown(f'''
+                <div class="success-box">
+                    ✅ Evaluation complete: Overall Score {results["overall_score"]}/10
+                </div>
+                ''', unsafe_allow_html=True)
+                
+                # Display evaluation metrics
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.markdown("### Evaluation Scores")
+                    metrics = [
+                        ("Definition Clarity", results.get("definition_clarity", 0)),
+                        ("Core Capabilities", results.get("core_capabilities", 0)),
+                        ("Boundaries", results.get("boundaries", 0)),
+                        ("Buyer/Use Case", results.get("buyer_use_case", 0)),
+                        ("Representative Vendors", results.get("representative_vendors", 0)),
+                        ("Market Overview", results.get("market_overview", 0)),
+                        ("Implementation Considerations", results.get("implementation_considerations", 0)),
+                        ("Vendor Landscape", results.get("vendor_landscape", 0)),
+                        ("Future Trends", results.get("future_trends", 0)),
+                        ("Integration Points", results.get("integration_points", 0)),
+                        ("Success Metrics", results.get("success_metrics", 0)),
+                        ("Common Challenges", results.get("common_challenges", 0)),
+                        ("Category Drift", results.get("category_drift", 0)),
+                        ("Overall Coherence", results.get("overall_coherence", 0)),
+                        ("Source Utilization", results.get("source_utilization", 0)),
+                        ("Faithfulness", results.get("faithfulness", 0)),
+                        ("Coverage", results.get("coverage", 0))
+                    ]
+                    
+                    for label, value in metrics:
+                        st.metric(label, f"{value}/10")
+                
+                with col2:
+                    # Create a simple visualization
+                    st.markdown("### Overall Score")
+                    score = results.get("overall_score", 0)
+                    st.metric("Overall Evaluation Score", f"{score}/10")
+                    
+                    # Performance indicator
+                    if score >= 8.0:
+                        st.success("Excellent quality synthesis")
+                    elif score >= 6.0:
+                        st.warning("Good quality synthesis")
+                    elif score >= 4.0:
+                        st.info("Fair quality synthesis")
+                    else:
+                        st.error("Poor quality synthesis")
+                
+                # Detailed reasoning expander
+                with st.expander("View Evaluation Details"):
+                    st.json(results)
 
 # Full workflow button
 st.markdown("---")
 st.markdown("### Quick Actions")
-col1, col2 = st.columns(2)
+col1, col2, col3 = st.columns(3)
 with col1:
     if st.button("🚀 Run Complete Workflow", type="primary"):
         with st.spinner("Running complete workflow..."):
@@ -396,7 +499,7 @@ with col1:
                 st.error(f"Workflow failed: {response.text}")
 
 with col2:
-    if st.button("📥 Export Results"):
+    if st.button("📥 Export Synthesis"):
         if st.session_state.synthesis_results:
             synthesis = st.session_state.synthesis_results['synthesis']
             st.download_button(
@@ -405,6 +508,68 @@ with col2:
                 file_name=f"category_definition_{synthesis['category_name'].replace(' ', '_')}.json",
                 mime="application/json"
             )
+
+with col3:
+    if st.button("💾 Export All Steps"):
+        # Check if we have workflow results
+        if (st.session_state.search_results is not None and 
+            st.session_state.scrape_results is not None and 
+            st.session_state.dedupe_results is not None and
+            st.session_state.score_results is not None and
+            st.session_state.synthesis_results is not None):
+            
+            # Compile all results into a single dictionary
+            complete_results = {
+                "search": st.session_state.search_results,
+                "scrape": st.session_state.scrape_results,
+                "deduplicate": st.session_state.dedupe_results,
+                "score": st.session_state.score_results,
+                "synthesize": st.session_state.synthesis_results
+            }
+            
+            # Add timestamp
+            complete_results["export_timestamp"] = datetime.now().isoformat()
+            
+            st.download_button(
+                label="Download Complete Workflow as JSON",
+                data=json.dumps(complete_results, indent=2),
+                file_name=f"category_workflow_complete_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                mime="application/json"
+            )
+        else:
+            # If we don't have all results, offer to run the full workflow first
+            if st.button("Run Full Workflow to Export"):
+                with st.spinner("Running complete workflow..."):
+                    response = requests.post(f"{API_BASE}/workflow/full")
+                    if response.status_code == 200:
+                        full_results = response.json()
+                        st.session_state.search_results = full_results['search']
+                        st.session_state.scrape_results = full_results['scrape']
+                        st.session_state.dedupe_results = full_results['deduplicate']
+                        st.session_state.score_results = full_results['score']
+                        st.session_state.synthesis_results = full_results['synthesize']
+                        st.session_state.workflow_step = 5
+                        
+                        # Now prepare the download
+                        complete_results = {
+                            "search": st.session_state.search_results,
+                            "scrape": st.session_state.scrape_results,
+                            "deduplicate": st.session_state.dedupe_results,
+                            "score": st.session_state.score_results,
+                            "synthesize": st.session_state.synthesis_results
+                        }
+                        
+                        # Add timestamp
+                        complete_results["export_timestamp"] = datetime.now().isoformat()
+                        
+                        st.download_button(
+                            label="Download Complete Workflow as JSON",
+                            data=json.dumps(complete_results, indent=2),
+                            file_name=f"category_workflow_complete_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                            mime="application/json"
+                        )
+                    else:
+                        st.error(f"Workflow failed: {response.text}")
 
 # Footer
 st.markdown("---")
