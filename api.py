@@ -309,27 +309,21 @@ def should_scrape_url(url: str, title: str, search_pass: str) -> Tuple[bool, str
         if blocked in hostname:
             return False, f"BLOCKED_DOMAIN: {blocked}"
     
+    # More lenient filtering - only block obvious non-content patterns
     non_content_patterns = [
-        "/page/", "/category/", "/tag/", "/author/",
-        "/search", "/login", "/register", "/contact",
-        "/privacy", "/terms", "/about", "/careers",
-        "/events", "/webinars", "/podcasts", "/videos",
-        "/download", "/pdf", "/whitepaper", "/ebook",
-        "/trial", "/demo", "/pricing", "/buy",
-        "/cart", "/checkout", "/payment", "/subscribe"
+        "/login", "/register", "/cart", "/checkout", "/payment", 
+        "/subscribe", "/jobs", "/careers"
     ]
     
     for pattern in non_content_patterns:
         if pattern in url_lower:
             return False, f"NON_CONTENT_PATTERN: {pattern}"
     
-    if not title or len(title.strip()) < 10:
+    # Much more lenient title requirement
+    if not title or len(title.strip()) < 5:
         return False, "SHORT_OR_MISSING_TITLE"
     
-    if search_pass.startswith("Tier2"):
-        if "blog" not in url_lower and "article" not in url_lower and "research" not in url_lower:
-            return False, "TIER2_NON_CONTENT_URL"
-    
+    # Removed the strict Tier2 content requirement
     return True, "PASS"
 
 def should_keep_scraped_content(article: Dict, max_age_months: int) -> Tuple[bool, str]:
@@ -337,7 +331,8 @@ def should_keep_scraped_content(article: Dict, max_age_months: int) -> Tuple[boo
         return False, f"SCRAPE_ERROR: {article.get('_error', 'unknown')}"
     
     text = article.get("text", "")
-    if not text or len(text) < 300:
+    # Much more lenient - only reject extremely short content
+    if not text or len(text) < 50:  # Reduced from 300 to 50
         return False, f"TOO_SHORT: {len(text)} chars"
     
     date_str = article.get("date")
@@ -349,8 +344,9 @@ def should_keep_scraped_content(article: Dict, max_age_months: int) -> Tuple[boo
     author = article.get("author", "")
     hostname = article.get("hostname", "")
     
+    # More lenient author requirement for analyst sites
     if any(analyst in hostname for analyst in ["gartner", "forrester", "idc", "constellation", "isg-one"]):
-        if not author or len(author.strip()) < 3:
+        if not author or len(author.strip()) < 2:  # Reduced from 3 to 2
             return False, "ANALYST_SITE_NO_AUTHOR"
     
     return True, "PASS"
@@ -690,23 +686,24 @@ async def synthesize_category(scored_sources: List[Dict]):
     # Select top sources for synthesis
     top_sources = [
         item for item in scored_sources
-        if item["score"]["relevance_score"] >= 5
-        and item["score"]["slots_filled"] >= 2
+        if item["score"]["relevance_score"] >= 3  # Reduced from 5 to 3
+        and item["score"]["slots_filled"] >= 1   # Reduced from 2 to 1
         and not item["score"]["single_vendor_bias"]
     ]
     
     if len(top_sources) < 3:
         top_sources = [
             item for item in scored_sources
-            if item["score"]["relevance_score"] >= 5
-            and item["score"]["slots_filled"] >= 2
+            if item["score"]["relevance_score"] >= 3  # Reduced from 5 to 3
+            and item["score"]["slots_filled"] >= 1   # Reduced from 2 to 1
         ]
     
     # Prepare source summaries for synthesis
     source_summaries = []
-    for item in top_sources[:5]:
+    for item in top_sources[:10]:  # Increased from 5 to 10 sources
         s = item["source"]
         sc = item["score"]
+        # Increased content length from 2000 to 4000 characters
         source_summaries.append(f"""
 Source: {s['title']}
 Author: {s['author']}
@@ -714,49 +711,64 @@ URL: {s['url']}
 Relevance: {sc['relevance_score']}/10
 Slots filled: {sc['slots_filled']}/5
 Vendors: {', '.join(sc['vendor_names'])}
-Content: {s['text'][:2000]}...
-""")
+Content: {s['text'][:4000]}...
+---""")
     
     sources_text = "\n".join(source_summaries)
     
     COMPREHENSIVE_SYNTHESIS_PROMPT = ChatPromptTemplate.from_messages([
-        ("system", """You are writing a comprehensive category definition page. The page must be written in editorial voice — no direct quotation from sources. Multi-source consensus carries definition.
+        ("system", """You are writing an extremely comprehensive category definition page that reads like a definitive industry report. The page must be written in editorial voice — no direct quotation from sources. Multi-source consensus carries definition.
 
 COMPREHENSIVE CONTENT REQUIREMENTS:
-- Each section should be substantial (3-6 paragraphs) with detailed insights
-- Use specific examples, vendor names, and concrete scenarios
-- Provide actionable insights for buyers and implementers
+- Each section should be extremely substantial (8-15 paragraphs minimum) with exhaustive details, deep insights, and comprehensive analysis
+- Use abundant specific examples, vendor names, concrete scenarios, case studies, and real-world applications
+- Provide highly actionable, strategic insights for buyers, implementers, and executives
+- Include quantitative data, market statistics, growth projections, and comparative analysis where possible
+- Structure content with clear subheadings, bullet points, and logical flow for easy consumption
+- Aim for 3000-5000+ words total for the complete category page
 
 DETAILED SECTION REQUIREMENTS:
-1. DEFINITION: 2-4 sentences describing what the SOFTWARE does.
-2. CORE CAPABILITIES: 6-10 detailed capabilities using function-verbs.
-3. BOUNDARIES: Comprehensive analysis of adjacent categories with specific examples.
-4. BUYER/USE CASE: Detailed breakdown of buyer personas and use cases.
-5. REPRESENTATIVE VENDORS: Comprehensive vendor list with categorization.
-6. MARKET OVERVIEW: Market size, growth rates, adoption patterns.
-7. IMPLEMENTATION CONSIDERATIONS: Technical requirements, integration needs.
-8. VENDOR LANDSCAPE: Analysis of market structure and competitive dynamics.
-9. FUTURE TRENDS: Emerging technologies and category evolution.
-10. INTEGRATION POINTS: How this category connects with other systems.
-11. SUCCESS METRICS: Specific KPIs and measurement approaches.
-12. COMMON CHALLENGES: Implementation hurdles and mitigation strategies.
-13. CATEGORY DRIFT: Analysis of analyst disagreement on scope.
+1. DEFINITION: 4-6 comprehensive paragraphs describing what the SOFTWARE does, its core purpose, evolution, and strategic importance in the modern business landscape.
 
-Return valid JSON matching the schema."""),
+2. CORE CAPABILITIES: 12-20 detailed capabilities organized into logical categories (strategic, operational, technical, analytical). Each capability should include explanation, benefits, use cases, and implementation considerations using strong function-verbs.
+
+3. BOUNDARIES: Exhaustive analysis of adjacent categories with specific examples, detailed comparison matrices, clear differentiation criteria, and guidance on when to choose this category vs alternatives.
+
+4. BUYER/USE CASE: Extremely detailed breakdown of buyer personas (titles, roles, responsibilities), use cases by industry/company size, buying journey stages, decision-making processes, and ROI justification frameworks.
+
+5. REPRESENTATIVE VENDORS: Extensive vendor list with deep categorization (by specialty, company size, geographic focus, pricing models), including market positioning, strengths, weaknesses, and ideal customer profiles for each.
+
+6. MARKET OVERVIEW: Deep dive into market size (TAM/SAM/SOM), growth rates (historical and projected), adoption patterns, maturity models, competitive landscape analysis, and key market drivers/trends.
+
+7. IMPLEMENTATION CONSIDERATIONS: Comprehensive technical requirements, integration needs, change management strategies, organizational considerations, skills/training requirements, and risk mitigation approaches.
+
+8. VENDOR LANDSCAPE: Sophisticated analysis of market structure (leaders, challengers, visionaries, niche players), competitive dynamics, partnership ecosystems, M&A activity, and investment trends.
+
+9. FUTURE TRENDS: Thorough examination of emerging technologies, regulatory impacts, evolving buyer behaviors, and long-term category evolution with specific timeline predictions.
+
+10. INTEGRATION POINTS: Detailed mapping of how this category connects with other systems (CRM, ERP, marketing automation, analytics, etc.), including technical standards, data models, and implementation best practices.
+
+11. SUCCESS METRICS: Extensive framework of specific KPIs, measurement approaches, benchmark data, and guidance on building effective measurement systems across short-term and long-term horizons.
+
+12. COMMON CHALLENGES: Deep exploration of implementation hurdles, organizational barriers, technical limitations, and proven mitigation strategies with real-world examples.
+
+13. CATEGORY DRIFT: Sophisticated analysis of analyst disagreement on scope, evolution of definitions over time, and implications for buyers and vendors.
+
+Return valid JSON matching the schema with extremely detailed content for each field."""),
         ("human", """Category: {category}
 Aliases: {aliases}
 
 Sources:
 {sources_text}
 
-Synthesize a comprehensive category page from these sources."""),
+Synthesize an extraordinarily comprehensive category page (aim for 3000-5000+ words total) from these sources, following all the detailed requirements above."""),
     ])
     
     llm = ChatOpenAI(model=OPENAI_MODEL, temperature=0, api_key=OPENAI_API_KEY)
     structured_llm = llm.with_structured_output(CategoryPageModel)
     chain = COMPREHENSIVE_SYNTHESIS_PROMPT | structured_llm
     
-    cache_key_parts = ("synthesis_v2", TEST_CATEGORY, str(len(top_sources)), sources_text[:1000])
+    cache_key_parts = ("synthesis_v2", TEST_CATEGORY, str(len(top_sources)), sources_text[:2000])
     cached = cache_get("llm_synthesis", *cache_key_parts)
     
     if cached is not None:
