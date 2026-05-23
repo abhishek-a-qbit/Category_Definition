@@ -10,6 +10,45 @@ from datetime import datetime
 
 # API base URL
 API_BASE = "http://localhost:8000"
+SYNTHESIS_TOP_N = 20
+
+
+def resolve_synthesis_source_links(synthesis_results, score_results):
+    """Links used in synthesis — from API response or rebuilt from score results."""
+    if synthesis_results:
+        links = synthesis_results.get("synthesis_sources") or []
+        if links:
+            return links
+    if not score_results:
+        return []
+    scored = score_results.get("scored_sources", [])
+    qualified = [
+        item for item in scored
+        if item["score"]["relevance_score"] >= 3
+        and item["score"]["slots_filled"] >= 1
+        and not item["score"]["single_vendor_bias"]
+    ]
+    if len(qualified) < 3:
+        qualified = [
+            item for item in scored
+            if item["score"]["relevance_score"] >= 3
+            and item["score"]["slots_filled"] >= 1
+        ]
+    selected = qualified[:SYNTHESIS_TOP_N]
+    return [
+        {
+            "url": item["source"]["url"],
+            "title": item["source"].get("title") or "Untitled",
+            "author": item["source"].get("author") or "",
+            "hostname": item["source"].get("hostname") or "",
+            "search_pass": item["source"].get("search_pass") or "",
+            "query_alias": item["source"].get("query_alias") or "",
+            "relevance_score": item["score"]["relevance_score"],
+            "slots_filled": item["score"]["slots_filled"],
+        }
+        for item in selected
+        if item.get("source", {}).get("url")
+    ]
 
 # Page configuration
 st.set_page_config(
@@ -165,7 +204,25 @@ if st.session_state.workflow_step >= 0:
     
     if st.session_state.search_results:
         results = st.session_state.search_results
-        st.markdown(f'<div class="success-box">✅ Search complete: {results["total_queries"]} queries → {results["total_urls"]} URLs found</div>', unsafe_allow_html=True)
+        blocked = results.get("search_blocked_at_search", 0)
+        st.markdown(
+            f'<div class="success-box">✅ Search complete: {results["total_queries"]} queries → '
+            f'{results["total_urls"]} URLs found ({blocked} blocked at search by DROP_URL_PATTERNS)</div>',
+            unsafe_allow_html=True,
+        )
+        fv = results.get("filter_validation")
+        if fv:
+            ok = fv.get("all_passed", False)
+            icon = "✅" if ok else "⚠️"
+            st.markdown(
+                f'{icon} **Filter validation (labeled fixtures):** '
+                f'pre-scrape reject {fv["pre_scrape"]["should_reject"]["passed"]}/{fv["pre_scrape"]["should_reject"]["total"]}, '
+                f'keep {fv["pre_scrape"]["should_keep"]["passed"]}/{fv["pre_scrape"]["should_keep"]["total"]} | '
+                f'post-scrape reject {fv["post_scrape"]["should_reject"]["passed"]}/{fv["post_scrape"]["should_reject"]["total"]}, '
+                f'keep {fv["post_scrape"]["should_keep"]["passed"]}/{fv["post_scrape"]["should_keep"]["total"]}'
+            )
+            if results.get("note"):
+                st.caption(results["note"])
         
         with st.expander("View Search Results"):
             for i, result in enumerate(results["results"]):
@@ -201,13 +258,44 @@ if st.session_state.workflow_step >= 1:
                 <li>Attempted to scrape: {results['attempted_scrape']}</li>
                 <li>Successfully scraped: {results['successfully_scraped']}</li>
                 <li>Post-scrape filtered: {results['post_scrape_filtered']}</li>
-                <li>Success rate: {results['successfully_scraped']/results['original_count']*100:.1f}%</li>
+                <li>Success rate: {results['successfully_scraped']/max(results['original_count'], 1)*100:.1f}%</li>
             </ul>
         </div>
         ''', unsafe_allow_html=True)
+
+        if results.get("pre_scrape_breakdown"):
+            st.markdown("**Pre-scrape filter breakdown:** " + ", ".join(
+                f"{k}: {v}" for k, v in results["pre_scrape_breakdown"].items()
+            ))
+        if results.get("post_scrape_breakdown"):
+            st.markdown("**Post-scrape filter breakdown:** " + ", ".join(
+                f"{k}: {v}" for k, v in results["post_scrape_breakdown"].items()
+            ))
+        st.caption(
+            "Post-scrape only drops failed fetches and stub pages (<150 chars). "
+            "Relevance, age, and byline quality are handled in the Score step before synthesis."
+        )
+
+        fv = results.get("filter_validation")
+        if fv:
+            ok = results.get("filters_ok", fv.get("all_passed", False))
+            st.markdown(f"{'✅' if ok else '⚠️'} **Filter validation:** {'All fixture cases passed' if ok else 'Some fixture cases failed — expand for details'}")
+            with st.expander("Filter validation (labeled good/bad cases)"):
+                for stage, label in [("pre_scrape", "Pre-scrape"), ("post_scrape", "Post-scrape")]:
+                    st.markdown(f"**{label}**")
+                    for direction in ("should_reject", "should_keep"):
+                        block = fv[stage][direction]
+                        st.markdown(f"- {direction}: {block['passed']}/{block['total']} passed")
+                        for case in block.get("cases", []):
+                            if not case["pass"]:
+                                st.markdown(f"  - FAIL {case['url']}: expected {case['expected']}, got {case['actual']} ({case['reason']})")
+                if fv.get("note"):
+                    st.caption(fv["note"])
         
         with st.expander("View Pre-scrape Filtered"):
-            for item in results['pre_scrape_details']:
+            if not results.get("pre_scrape_details"):
+                st.info("No URLs filtered at pre-scrape (bad URLs may already be removed at search).")
+            for item in results.get("pre_scrape_details", []):
                 st.markdown(f"✗ **{item['reason']}:** {item['title'][:60]}")
                 st.text(item['url'])
         
@@ -313,7 +401,7 @@ if st.session_state.workflow_step >= 4:
         
         st.markdown(f'''
         <div class="success-box">
-            ✅ Synthesis complete using {results['sources_used']} high-quality sources
+            ✅ Synthesis complete using {results['sources_used']} of up to {results.get('synthesis_top_n', 20)} top-scored sources
         </div>
         ''', unsafe_allow_html=True)
         
@@ -325,24 +413,53 @@ if st.session_state.workflow_step >= 4:
         
         # Display source links
         st.markdown("---")
-        st.markdown("### Source Links Used")
-        if st.session_state.score_results:
-            top_sources = [
-                item for item in st.session_state.score_results['scored_sources']
-                if item['score']['relevance_score'] >= 5
-                and item['score']['slots_filled'] >= 2
-                and not item['score']['single_vendor_bias']
-            ]
-            if len(top_sources) < 3:
-                top_sources = [
-                    item for item in st.session_state.score_results['scored_sources']
-                    if item['score']['relevance_score'] >= 5
-                    and item['score']['slots_filled'] >= 2
-                ]
-            for i, item in enumerate(top_sources[:5]):
-                s = item['source']
-                sc = item['score']
-                st.markdown(f"**{i+1}.** [{s['title']}]({s['url']}) - Relevance: {sc['relevance_score']}/10")
+        category_vendors = results.get("category_vendors", [])
+        if category_vendors:
+            st.markdown("### Category Vendors (from scored sources)")
+            st.markdown(", ".join(category_vendors))
+
+        source_links = resolve_synthesis_source_links(
+            results, st.session_state.score_results
+        )
+        if source_links and not results.get("synthesis_sources"):
+            results["synthesis_sources"] = source_links
+            st.session_state.synthesis_results = results
+
+        st.markdown(f"### Source Links Used in Synthesis ({len(source_links)})")
+        if source_links:
+            for i, src in enumerate(source_links):
+                title = src.get("title") or "Untitled"
+                url = src.get("url", "")
+                st.markdown(f"**{i+1}.** [{title}]({url})")
+                meta = (
+                    f"Relevance: {src.get('relevance_score', '—')}/10 · "
+                    f"Slots: {src.get('slots_filled', '—')}/5 · "
+                    f"Pass: {src.get('search_pass', '—')} · "
+                    f"Host: {src.get('hostname', '—')}"
+                )
+                if src.get("author"):
+                    meta += f" · Author: {src['author']}"
+                st.caption(meta)
+            with st.expander("View as table"):
+                st.dataframe(
+                    [
+                        {
+                            "#": i + 1,
+                            "Title": s.get("title"),
+                            "URL": s.get("url"),
+                            "Relevance": s.get("relevance_score"),
+                            "Search pass": s.get("search_pass"),
+                        }
+                        for i, s in enumerate(source_links)
+                    ],
+                    use_container_width=True,
+                    hide_index=True,
+                )
+        else:
+            st.warning(
+                "No source links available. Complete **Score** then **Synthesis**, "
+                "or run the full workflow."
+            )
         
         st.markdown("---")
         
@@ -381,31 +498,23 @@ if st.session_state.workflow_step >= 4:
                     sys.path.append('.')
                     from ai import evaluate_synthesis
                     
-                    # Extract source content from scored sources that were used in synthesis
                     source_content = []
-                    if st.session_state.score_results:
-                        scored_sources = st.session_state.score_results.get('scored_sources', [])
-                        # Get sources that were actually used in synthesis (high quality)
-                        top_sources = [
-                            item for item in scored_sources
-                            if item["score"]["relevance_score"] >= 5
-                            and item["score"]["slots_filled"] >= 2
-                            and not item["score"]["single_vendor_bias"]
-                        ]
-                        if len(top_sources) < 3:
-                            top_sources = [
-                                item for item in scored_sources
-                                if item["score"]["relevance_score"] >= 5
-                                and item["score"]["slots_filled"] >= 2
-                            ]
-                        # Convert to the format expected by evaluator (url, title, text)
-                        for item in top_sources[:5]:  # Limit to top 5 sources
+                    if st.session_state.synthesis_results and st.session_state.score_results:
+                        used_urls = {
+                            s["url"]
+                            for s in resolve_synthesis_source_links(
+                                st.session_state.synthesis_results,
+                                st.session_state.score_results,
+                            )
+                        }
+                        for item in st.session_state.score_results.get("scored_sources", []):
                             source = item["source"]
-                            source_content.append({
-                                "url": source.get("url", ""),
-                                "title": source.get("title", ""),
-                                "text": source.get("text", "")[:2000]  # Limit text length
-                            })
+                            if source.get("url") in used_urls:
+                                source_content.append({
+                                    "url": source.get("url", ""),
+                                    "title": source.get("title", ""),
+                                    "text": source.get("text", "")[:2000],
+                                })
                     
                     evaluation_results = evaluate_synthesis(synthesis, synthesis['category_name'], source_content)
                     st.session_state.evaluation_results = evaluation_results

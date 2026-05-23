@@ -4,6 +4,7 @@ Based on test.ipynb - searches, scrapes, scores, and synthesizes category defini
 """
 
 import os
+import re
 import hashlib
 import json
 import pathlib
@@ -45,6 +46,8 @@ CACHE_DIR.mkdir(exist_ok=True)
 SEARCH_DELAY = 0.3
 SCRAPE_DELAY = 0.5
 LLM_DELAY = 0.2
+SYNTHESIS_TOP_N = 20
+SYNTHESIS_CONTENT_CHARS = 3000
 
 # Category configuration
 TEST_CATEGORY = "Account-Based Marketing"
@@ -298,58 +301,262 @@ def extract_article(url: str) -> Optional[Dict]:
     except Exception as e:
         return {"_error": f"exception: {type(e).__name__}: {e}"}
 
+NON_CONTENT_URL_PATTERNS = [
+    "/page/", "/tag/", "/author/", "/hub/",
+    "/search", "/login", "/register", "/contact",
+    "/privacy", "/terms", "/about", "/careers",
+    "/events", "/webinars", "/podcasts", "/videos",
+    "/download", "/pdf", "/whitepaper", "/ebook",
+    "/trial", "/demo", "/pricing", "/buy",
+    "/cart", "/checkout", "/payment", "/subscribe",
+]
+
+VENDOR_TITLE_PATTERNS = [
+    "best", "top", "vs", "comparison", "review", "rating",
+    "pricing", "cost", "trial", "demo", "free",
+    "buy now", "get started", "sign up", "download",
+]
+
+# Post-scrape: only reject broken/empty fetches. Semantic quality is handled by LLM scoring.
+MIN_SCRAPED_TEXT_LEN = 150
+MIN_TITLE_LEN = 10
+
+
+
+
 def should_scrape_url(url: str, title: str, search_pass: str) -> Tuple[bool, str]:
+    """Pre-scrape filter: decide if URL should be scraped (restored from e905990 / test.ipynb)."""
     url_lower = url.lower()
     for pattern in DROP_URL_PATTERNS:
         if pattern in url_lower:
             return False, f"DROP_URL_PATTERN: {pattern}"
-    
+
     hostname = urlparse(url).netloc.lower()
     for blocked in SERPER_EXCLUDE_SITES:
         if blocked in hostname:
             return False, f"BLOCKED_DOMAIN: {blocked}"
-    
-    # More lenient filtering - only block obvious non-content patterns
-    non_content_patterns = [
-        "/login", "/register", "/cart", "/checkout", "/payment", 
-        "/subscribe", "/jobs", "/careers"
-    ]
-    
-    for pattern in non_content_patterns:
+
+    for pattern in NON_CONTENT_URL_PATTERNS:
         if pattern in url_lower:
             return False, f"NON_CONTENT_PATTERN: {pattern}"
-    
-    # Much more lenient title requirement
-    if not title or len(title.strip()) < 5:
+
+    if not title or len(title.strip()) < MIN_TITLE_LEN:
         return False, "SHORT_OR_MISSING_TITLE"
-    
-    # Removed the strict Tier2 content requirement
+
+    title_lower = title.lower()
+    for pattern in VENDOR_TITLE_PATTERNS:
+        if pattern in title_lower and len(title_lower.split()) < 8:
+            return False, f"VENDOR_TITLE_PATTERN: {pattern}"
+
+    if search_pass.startswith("Tier2"):
+        if not any(ind in url_lower for ind in ("blog", "article", "research", "insight", "analysis", "report")):
+            return False, "TIER2_NON_CONTENT_URL"
+
     return True, "PASS"
 
+
 def should_keep_scraped_content(article: Dict, max_age_months: int) -> Tuple[bool, str]:
+    """
+    Post-scrape gate: only drop pages that failed to fetch or have no usable text.
+
+    Age, byline, and marketing quality are deferred to LLM scoring (which already
+    receives date, author, and full text) so synthesis still receives candidates.
+    """
+    del max_age_months  # reserved for scoring prompt / future soft warnings
+
     if not article or "_error" in article:
         return False, f"SCRAPE_ERROR: {article.get('_error', 'unknown')}"
-    
+
     text = article.get("text", "")
-    # Much more lenient - only reject extremely short content
-    if not text or len(text) < 50:  # Reduced from 300 to 50
+    if not text or len(text.strip()) < MIN_SCRAPED_TEXT_LEN:
         return False, f"TOO_SHORT: {len(text)} chars"
-    
-    date_str = article.get("date")
-    if date_str:
-        age = source_age_months(date_str)
-        if age is not None and age > max_age_months:
-            return False, f"TOO_OLD: {age} months (max: {max_age_months})"
-    
-    author = article.get("author", "")
-    hostname = article.get("hostname", "")
-    
-    # More lenient author requirement for analyst sites
-    if any(analyst in hostname for analyst in ["gartner", "forrester", "idc", "constellation", "isg-one"]):
-        if not author or len(author.strip()) < 2:  # Reduced from 3 to 2
-            return False, "ANALYST_SITE_NO_AUTHOR"
-    
+
     return True, "PASS"
+
+
+_PLACEHOLDER_VENDOR = re.compile(r"^vendor\s*\d+$", re.I)
+# Ad/social channels and generic labels — not category software vendors
+_EXCLUDED_VENDOR_TERMS = frozenset({
+    "programmatic display", "display advertising", "social media", "social",
+    "linkedin", "meta", "facebook", "tiktok", "reddit", "google", "twitter",
+    "youtube", "email", "crm", "erp", "analytics", "advertising",
+})
+_GENERIC_VENDOR_PHRASES = (
+    "marketing technology",
+    "marketing automation",
+    "data provider",
+    "account-based marketing platform",
+    "abm platform",
+    "b2b marketing",
+)
+
+
+def sanitize_vendor_names(names: List[str]) -> List[str]:
+    """Drop placeholders and non-vendor labels from scored vendor lists."""
+    out: List[str] = []
+    for raw in names or []:
+        name = (raw or "").strip()
+        if not name or len(name) < 2:
+            continue
+        if _PLACEHOLDER_VENDOR.match(name):
+            continue
+        lower = name.lower()
+        if lower in _EXCLUDED_VENDOR_TERMS:
+            continue
+        if any(phrase in lower for phrase in _GENERIC_VENDOR_PHRASES):
+            continue
+        out.append(name)
+    seen: set = set()
+    deduped: List[str] = []
+    for n in out:
+        key = n.lower()
+        if key not in seen:
+            seen.add(key)
+            deduped.append(n)
+    return deduped
+
+
+def aggregate_category_vendors(synthesis_sources: List[Dict]) -> List[str]:
+    """Union of category vendors from synthesis sources, ranked by mention frequency."""
+    counts: Dict[str, int] = {}
+    canonical: Dict[str, str] = {}
+    for item in synthesis_sources:
+        for v in sanitize_vendor_names(item.get("score", {}).get("vendor_names", [])):
+            key = v.lower()
+            counts[key] = counts.get(key, 0) + 1
+            canonical.setdefault(key, v)
+    return [canonical[k] for k in sorted(counts.keys(), key=lambda x: (-counts[x], x))]
+
+
+def _vendor_name_from_synthesis_entry(entry: str) -> str:
+    return entry.split("(")[0].split("—")[0].split(" - ")[0].strip()
+
+
+def _vendor_matches_allowed(name: str, allowed: List[str]) -> bool:
+    nl = name.lower()
+    for a in allowed:
+        al = a.lower()
+        if nl == al or nl.startswith(al + " ") or al in nl:
+            return True
+    return False
+
+
+def apply_authoritative_vendors_to_synthesis(
+    synthesis_out: Dict,
+    allowed_vendors: List[str],
+    category: str,
+) -> Dict:
+    """Ensure representative_vendors only lists vendors grounded in source scores."""
+    if not allowed_vendors:
+        return synthesis_out
+    rep = synthesis_out.get("representative_vendors") or []
+    kept = [
+        entry for entry in rep
+        if _vendor_matches_allowed(_vendor_name_from_synthesis_entry(entry), allowed_vendors)
+    ]
+    if not kept:
+        kept = [
+            f"{v} — representative {category} vendor cited in analyst sources"
+            for v in allowed_vendors[:20]
+        ]
+    synthesis_out["representative_vendors"] = kept
+    return synthesis_out
+
+
+def normalize_scored_vendor_fields(score_dict: Dict) -> Dict:
+    names = sanitize_vendor_names(score_dict.get("vendor_names", []))
+    score_dict["vendor_names"] = names
+    score_dict["vendor_count"] = len(names)
+    score_dict["slot_vendors"] = len(names) > 0
+    return score_dict
+
+
+def select_sources_for_synthesis(scored_sources: List[Dict]) -> List[Dict]:
+    """Pick up to SYNTHESIS_TOP_N sources for synthesis (same rules as /synthesize)."""
+    qualified = [
+        item for item in scored_sources
+        if item["score"]["relevance_score"] >= 3
+        and item["score"]["slots_filled"] >= 1
+        and not item["score"]["single_vendor_bias"]
+    ]
+    if len(qualified) < 3:
+        qualified = [
+            item for item in scored_sources
+            if item["score"]["relevance_score"] >= 3
+            and item["score"]["slots_filled"] >= 1
+        ]
+    return qualified[:SYNTHESIS_TOP_N]
+
+
+def format_synthesis_source_links(synthesis_sources: List[Dict]) -> List[Dict]:
+    """Serializable link rows for UI and exports."""
+    links = []
+    for item in synthesis_sources:
+        s = item.get("source", {})
+        sc = item.get("score", {})
+        url = s.get("url") or ""
+        if not url:
+            continue
+        links.append({
+            "url": url,
+            "title": s.get("title") or "Untitled",
+            "author": s.get("author") or "",
+            "hostname": s.get("hostname") or "",
+            "search_pass": s.get("search_pass") or "",
+            "query_alias": s.get("query_alias") or "",
+            "relevance_score": sc.get("relevance_score"),
+            "slots_filled": sc.get("slots_filled"),
+        })
+    return links
+
+
+def _evaluate_pre_scrape_cases(cases: List[Dict], expected_reject: bool) -> Dict:
+    rows = []
+    for case in cases:
+        keep, reason = should_scrape_url(case["url"], case["title"], case["search_pass"])
+        rejected = not keep
+        rows.append({
+            "url": case["url"],
+            "title": case["title"][:80],
+            "expected": "reject" if expected_reject else "keep",
+            "actual": "reject" if rejected else "keep",
+            "reason": reason,
+            "pass": rejected == expected_reject,
+        })
+    passed = sum(1 for r in rows if r["pass"])
+    return {
+        "total": len(rows),
+        "passed": passed,
+        "failed": len(rows) - passed,
+        "pass_rate": round(passed / len(rows), 3) if rows else 1.0,
+        "cases": rows,
+    }
+
+
+def _evaluate_post_scrape_cases(cases: List[Dict], expected_reject: bool) -> Dict:
+    rows = []
+    for case in cases:
+        keep, reason = should_keep_scraped_content(case, MAX_SOURCE_AGE_MONTHS)
+        rejected = not keep
+        rows.append({
+            "url": case.get("url", ""),
+            "title": (case.get("title") or "")[:80],
+            "expected": "reject" if expected_reject else "keep",
+            "actual": "reject" if rejected else "keep",
+            "reason": reason,
+            "pass": rejected == expected_reject,
+        })
+    passed = sum(1 for r in rows if r["pass"])
+    return {
+        "total": len(rows),
+        "passed": passed,
+        "failed": len(rows) - passed,
+        "pass_rate": round(passed / len(rows), 3) if rows else 1.0,
+        "cases": rows,
+    }
+
+
+
 
 # API Endpoints
 @app.get("/")
@@ -425,6 +632,7 @@ async def search_sources():
     seen_urls = set()
     all_results = []
     total_queries = 0
+    total_blocked = 0
     
     # Pass 1: Tier 1 primary aliases
     def run_search_pass(name: str, sites: List[str], aliases: List[str], batch_size: int, num_per_query: int = 6):
@@ -470,16 +678,25 @@ async def search_sources():
         
         total_queries += queries_run
         return {"queries_run": queries_run, "hits_added": hits_added, "blocked": blocked}
-    
-    run_search_pass("Tier1-primary", TIER1_SITES, FOCUSED_ALIASES, batch_size=3)
-    run_search_pass("Tier1-secondary", TIER1_SITES, SECONDARY_ALIASES, batch_size=3)
-    run_search_pass("Tier2-key", KEY_TIER2_SITES, FOCUSED_ALIASES, batch_size=5)
-    run_search_pass("Tier2-key", KEY_TIER2_SITES, SECONDARY_ALIASES, batch_size=5)
+
+    pass_stats = []
+    pass_stats.append(run_search_pass("Tier1-primary", TIER1_SITES, FOCUSED_ALIASES, batch_size=3))
+    pass_stats.append(run_search_pass("Tier1-secondary", TIER1_SITES, SECONDARY_ALIASES, batch_size=3))
+    pass_stats.append(run_search_pass("Tier2-key", KEY_TIER2_SITES, FOCUSED_ALIASES, batch_size=5))
+    pass_stats.append(run_search_pass("Tier2-key", KEY_TIER2_SITES, SECONDARY_ALIASES, batch_size=5))
+    total_blocked = sum(s["blocked"] for s in pass_stats)
     
     return {
         "total_queries": total_queries,
         "total_urls": len(all_results),
+        "search_blocked_at_search": total_blocked,
         "results": all_results,
+        
+        "note": (
+            "search_blocked_at_search uses DROP_URL_PATTERNS only. "
+            "Pre-scrape applies NON_CONTENT, title, and Tier2 rules. "
+            "Post-scrape keeps all successful fetches with >=150 chars for scoring."
+        ),
     }
 
 @app.post("/scrape")
@@ -520,17 +737,38 @@ async def scrape_sources(search_results: List[SearchResult]):
             })
         
         time.sleep(SCRAPE_DELAY)
+
+    pre_scrape_breakdown: Dict[str, int] = {}
+    for item in pre_scrape_filtered:
+        key = item["reason"].split(":")[0]
+        pre_scrape_breakdown[key] = pre_scrape_breakdown.get(key, 0) + 1
+
+    post_scrape_breakdown: Dict[str, int] = {}
+    for item in scrape_failures:
+        key = item["reason"].split(":")[0]
+        post_scrape_breakdown[key] = post_scrape_breakdown.get(key, 0) + 1
+
     
+
     return {
         "original_count": len(search_results),
         "pre_scrape_filtered": len(pre_scrape_filtered),
+        "pre_scrape_breakdown": pre_scrape_breakdown,
         "attempted_scrape": len(filtered_for_scraping),
         "successfully_scraped": len(scraped_sources),
         "post_scrape_filtered": len(scrape_failures),
+        "post_scrape_breakdown": post_scrape_breakdown,
         "scraped_sources": scraped_sources,
         "pre_scrape_details": pre_scrape_filtered[:10],
-        "scrape_failures": scrape_failures[:10],
+        "scrape_failures": scrape_failures[:10]
+        
     }
+
+
+@app.post("/validate-filters")
+async def validate_filters_endpoint():
+    """Run labeled pre/post filter comparison without scraping."""
+    return validate_scrape_filters()
 
 @app.post("/deduplicate")
 async def deduplicate_sources(scraped_sources: List[ScrapedSource]):
@@ -581,13 +819,18 @@ async def score_sources(sources: List[ScrapedSource]):
     SCORING_PROMPT = ChatPromptTemplate.from_messages([
         ("system", """You are evaluating a web source for its usefulness in defining the software category "{category}".
 
-Score it on these criteria:
+CRITICAL FIRST CHECK: Determine whether the scraped content MAINLY talks about the category "{category}".
+- Read the full content carefully. Is the primary subject matter actually about "{category}"?
+- If the content is about a different topic, a different software category, or only mentions "{category}" tangentially, it is NOT relevant.
+- If the content does NOT mainly discuss "{category}", you MUST set relevance_score to 0-2 (low) and explain in reasoning why it's not relevant.
+
+After the category relevance check, score on these criteria:
 1. SLOT-FILL: Does it contain (a) a definition, (b) core capabilities, (c) boundaries vs adjacent categories, (d) buyer/use case, (e) representative vendors? Count how many of these 5 slots it fills.
 2. FUNCTION-VERBS: Does it use expert verbs (orchestrate, unify, score, route, match, segment, personalize, align) rather than SEO adjectives?
 3. BYLINE QUALITY: Evaluate the author byline - "named_analyst", "named_author", or "no_byline".
-4. VENDOR DIVERSITY: How many distinct vendors are named? CRITICAL: Extract ACTUAL vendor/product names from the content. Look for company names like "Salesforce", "HubSpot", "Adobe", "Marketo", "6sense", "Demandbase", etc. Do NOT use placeholders like "Vendor 1, Vendor 2". If the text mentions specific companies, list their exact names. If no vendors are mentioned, return an empty list []. Examples of correct output: ["Salesforce", "HubSpot", "Adobe"] or [] if none found.
+4. CATEGORY VENDORS: Extract ONLY companies that sell software/platforms in the "{category}" category (named in the article as vendors/products in THAT category). Use exact company names from the text. EXCLUDE: placeholders (Vendor 1, Vendor 2), social/ad channels (LinkedIn, Meta, TikTok, Reddit, Google), generic labels (programmatic display), and vendors from adjacent categories (CRM, ERP, MAP) unless the article explicitly lists them as "{category}" platform vendors. If none are named for this category, return vendor_names: [] and vendor_count: 0.
 5. SME CONTENT: Is this analyst/expert content or marketing fluff?
-6. RELEVANCE: How useful is this source (1-10)?
+6. RELEVANCE: How useful is this {category} source (1-10)? This should be LOW (0-2) if the content does not mainly discuss "{category}".
 
 Return valid JSON matching the schema."""),
         ("human", """Source URL: {url}
@@ -624,27 +867,28 @@ Content (first 3000 chars):
             "text": text_trunc,
         }
         
-        cache_key_parts = ("scoring_v2", TEST_CATEGORY, s.url, s.title or "Unknown",
+        cache_key_parts = ("scoring_v3_category_vendors", TEST_CATEGORY, s.url, s.title or "Unknown",
                            s.author or "Unknown", s.date or "Unknown",
                            s.hostname or "Unknown", text_trunc)
         cached = cache_get("llm_scoring", *cache_key_parts)
         
         if cached is not None:
             score_data = cached["score"] if "score" in cached else cached
-            score = SourceScoreModel(**score_data)
+            score_data = normalize_scored_vendor_fields(dict(score_data))
             cache_hits += 1
-            scored_sources.append({"source": s.model_dump(), "score": score.model_dump()})
+            scored_sources.append({"source": s.model_dump(), "score": score_data})
             continue
         
         try:
             score = chain.invoke(invoke_params)
+            score_data = normalize_scored_vendor_fields(score.model_dump())
             rendered_msgs = SCORING_PROMPT.format_messages(**invoke_params)
             rendered_prompt = "\n".join(f"[{m.type}] {m.content}" for m in rendered_msgs)
             cache_set("llm_scoring", {
-                "score": score.model_dump(),
+                "score": score_data,
                 "prompt": rendered_prompt,
             }, *cache_key_parts)
-            scored_sources.append({"source": s.model_dump(), "score": score.model_dump()})
+            scored_sources.append({"source": s.model_dump(), "score": score_data})
             time.sleep(LLM_DELAY)
         except Exception as e:
             pass
@@ -671,7 +915,9 @@ async def synthesize_category(scored_sources: List[Dict]):
         core_capabilities: list[str] = Field(description="Detailed core software capabilities")
         boundaries: str = Field(description="Explanation of what this category is NOT")
         buyer_use_case: str = Field(description="Description of buyer personas and use cases")
-        representative_vendors: list[str] = Field(description="Named vendors from multiple sources")
+        representative_vendors: list[str] = Field(
+            description="ONLY vendors from the authoritative category vendor list provided in the prompt; one entry per vendor with brief positioning"
+        )
         category_drift: str = Field(description="Analysis of analyst disagreement")
         market_overview: str = Field(description="Market size, growth trends")
         implementation_considerations: str = Field(description="Key implementation considerations")
@@ -683,27 +929,19 @@ async def synthesize_category(scored_sources: List[Dict]):
         source_count: int = Field(description="Number of sources used")
         confidence: str = Field(description="high/medium/low")
     
-    # Select top sources for synthesis
-    top_sources = [
-        item for item in scored_sources
-        if item["score"]["relevance_score"] >= 3  # Reduced from 5 to 3
-        and item["score"]["slots_filled"] >= 1   # Reduced from 2 to 1
-        and not item["score"]["single_vendor_bias"]
-    ]
-    
-    if len(top_sources) < 3:
-        top_sources = [
-            item for item in scored_sources
-            if item["score"]["relevance_score"] >= 3  # Reduced from 5 to 3
-            and item["score"]["slots_filled"] >= 1   # Reduced from 2 to 1
-        ]
-    
-    # Prepare source summaries for synthesis
+    synthesis_sources = select_sources_for_synthesis(scored_sources)
+    synthesis_source_links = format_synthesis_source_links(synthesis_sources)
+    category_vendors = aggregate_category_vendors(synthesis_sources)
+    vendors_block = (
+        ", ".join(category_vendors)
+        if category_vendors
+        else "(none extracted from sources — leave representative_vendors empty)"
+    )
+
     source_summaries = []
-    for item in top_sources[:10]:  # Increased from 5 to 10 sources
+    for item in synthesis_sources:
         s = item["source"]
         sc = item["score"]
-        # Increased content length from 2000 to 4000 characters
         source_summaries.append(f"""
 Source: {s['title']}
 Author: {s['author']}
@@ -711,7 +949,7 @@ URL: {s['url']}
 Relevance: {sc['relevance_score']}/10
 Slots filled: {sc['slots_filled']}/5
 Vendors: {', '.join(sc['vendor_names'])}
-Content: {s['text'][:4000]}...
+Content: {s['text'][:SYNTHESIS_CONTENT_CHARS]}...
 ---""")
     
     sources_text = "\n".join(source_summaries)
@@ -736,13 +974,13 @@ DETAILED SECTION REQUIREMENTS:
 
 4. BUYER/USE CASE: Extremely detailed breakdown of buyer personas (titles, roles, responsibilities), use cases by industry/company size, buying journey stages, decision-making processes, and ROI justification frameworks.
 
-5. REPRESENTATIVE VENDORS: Extensive vendor list with deep categorization (by specialty, company size, geographic focus, pricing models), including market positioning, strengths, weaknesses, and ideal customer profiles for each.
+5. REPRESENTATIVE VENDORS: List ONLY companies from the AUTHORITATIVE VENDOR LIST in the user message. One bullet per vendor with positioning (Leader/Challenger/Specialist) supported by sources. Never invent vendors not in that list. Do not list social/ad platforms, generic CRM/ERP, or vendors from adjacent categories unless they are on the authoritative list.
 
-6. MARKET OVERVIEW: Deep dive into market size (TAM/SAM/SOM), growth rates (historical and projected), adoption patterns, maturity models, competitive landscape analysis, and key market drivers/trends.
+6. MARKET OVERVIEW: Deep dive into market size (TAM/SAM/SOM), growth rates, adoption patterns, and drivers. When naming vendors, use ONLY the authoritative vendor list — do not mention random enterprise brands as category vendors.
 
 7. IMPLEMENTATION CONSIDERATIONS: Comprehensive technical requirements, integration needs, change management strategies, organizational considerations, skills/training requirements, and risk mitigation approaches.
 
-8. VENDOR LANDSCAPE: Sophisticated analysis of market structure (leaders, challengers, visionaries, niche players), competitive dynamics, partnership ecosystems, M&A activity, and investment trends.
+8. VENDOR LANDSCAPE: Analyze market structure using ONLY vendors from the authoritative list; do not introduce vendors absent from that list.
 
 9. FUTURE TRENDS: Thorough examination of emerging technologies, regulatory impacts, evolving buyer behaviors, and long-term category evolution with specific timeline predictions.
 
@@ -758,6 +996,9 @@ Return valid JSON matching the schema with extremely detailed content for each f
         ("human", """Category: {category}
 Aliases: {aliases}
 
+AUTHORITATIVE VENDOR LIST for "{category}" (extracted from sources below — use ONLY these in representative_vendors and when naming category vendors elsewhere):
+{category_vendors}
+
 Sources:
 {sources_text}
 
@@ -768,7 +1009,13 @@ Synthesize an extraordinarily comprehensive category page (aim for 3000-5000+ wo
     structured_llm = llm.with_structured_output(CategoryPageModel)
     chain = COMPREHENSIVE_SYNTHESIS_PROMPT | structured_llm
     
-    cache_key_parts = ("synthesis_v2", TEST_CATEGORY, str(len(top_sources)), sources_text[:2000])
+    cache_key_parts = (
+        "synthesis_v4_category_vendors",
+        TEST_CATEGORY,
+        str(len(synthesis_sources)),
+        vendors_block[:500],
+        sources_text[:3000],
+    )
     cached = cache_get("llm_synthesis", *cache_key_parts)
     
     if cached is not None:
@@ -778,15 +1025,25 @@ Synthesize an extraordinarily comprehensive category page (aim for 3000-5000+ wo
             synthesis = chain.invoke({
                 "category": TEST_CATEGORY,
                 "aliases": ", ".join(CATEGORY_ALIASES),
+                "category_vendors": vendors_block,
                 "sources_text": sources_text,
             })
             cache_set("llm_synthesis", synthesis.model_dump(), *cache_key_parts)
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Synthesis failed: {str(e)}")
-    
+
+    synthesis_out = synthesis if isinstance(synthesis, dict) else synthesis.model_dump()
+    synthesis_out["source_count"] = len(synthesis_sources)
+    synthesis_out = apply_authoritative_vendors_to_synthesis(
+        synthesis_out, category_vendors, TEST_CATEGORY
+    )
+
     return {
-        "sources_used": len(top_sources),
-        "synthesis": synthesis if isinstance(synthesis, dict) else synthesis.model_dump(),
+        "sources_used": len(synthesis_sources),
+        "synthesis_top_n": SYNTHESIS_TOP_N,
+        "category_vendors": category_vendors,
+        "synthesis_sources": synthesis_source_links,
+        "synthesis": synthesis_out,
     }
 
 @app.post("/workflow/full")
