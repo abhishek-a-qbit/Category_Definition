@@ -50,6 +50,25 @@ def resolve_synthesis_source_links(synthesis_results, score_results):
         if item.get("source", {}).get("url")
     ]
 
+
+def select_sources_for_synthesis(score_results):
+    if not score_results:
+        return []
+    scored = score_results.get("scored_sources", [])
+    qualified = [
+        item for item in scored
+        if item["score"]["relevance_score"] >= 3
+        and item["score"]["slots_filled"] >= 1
+        and not item["score"]["single_vendor_bias"]
+    ]
+    if len(qualified) < 3:
+        qualified = [
+            item for item in scored
+            if item["score"]["relevance_score"] >= 3
+            and item["score"]["slots_filled"] >= 1
+        ]
+    return qualified[:SYNTHESIS_TOP_N]
+
 # Page configuration
 st.set_page_config(
     page_title="Category Definition Workflow",
@@ -254,7 +273,6 @@ if st.session_state.workflow_step >= 1:
             <strong>Scrape Results:</strong>
             <ul>
                 <li>Original URLs: {results['original_count']}</li>
-                <li>Pre-scrape filtered: {results['pre_scrape_filtered']}</li>
                 <li>Attempted to scrape: {results['attempted_scrape']}</li>
                 <li>Successfully scraped: {results['successfully_scraped']}</li>
                 <li>Post-scrape filtered: {results['post_scrape_filtered']}</li>
@@ -263,16 +281,12 @@ if st.session_state.workflow_step >= 1:
         </div>
         ''', unsafe_allow_html=True)
 
-        if results.get("pre_scrape_breakdown"):
-            st.markdown("**Pre-scrape filter breakdown:** " + ", ".join(
-                f"{k}: {v}" for k, v in results["pre_scrape_breakdown"].items()
-            ))
         if results.get("post_scrape_breakdown"):
             st.markdown("**Post-scrape filter breakdown:** " + ", ".join(
                 f"{k}: {v}" for k, v in results["post_scrape_breakdown"].items()
             ))
         st.caption(
-            "Post-scrape only drops failed fetches and stub pages (<150 chars). "
+            "There is no pre-scrape filter. Scrape attempts all search results and only drops failed fetches or stub pages (<100 chars). "
             "Relevance, age, and byline quality are handled in the Score step before synthesis."
         )
 
@@ -291,13 +305,6 @@ if st.session_state.workflow_step >= 1:
                                 st.markdown(f"  - FAIL {case['url']}: expected {case['expected']}, got {case['actual']} ({case['reason']})")
                 if fv.get("note"):
                     st.caption(fv["note"])
-        
-        with st.expander("View Pre-scrape Filtered"):
-            if not results.get("pre_scrape_details"):
-                st.info("No URLs filtered at pre-scrape (bad URLs may already be removed at search).")
-            for item in results.get("pre_scrape_details", []):
-                st.markdown(f"✗ **{item['reason']}:** {item['title'][:60]}")
-                st.text(item['url'])
         
         with st.expander("View Successfully Scraped URLs"):
             for i, item in enumerate(results['scraped_sources']):
@@ -385,6 +392,19 @@ if st.session_state.workflow_step >= 3:
 if st.session_state.workflow_step >= 4:
     st.markdown('<div class="step-header"><h2>Step 5: Synthesize Category Page</h2></div>', unsafe_allow_html=True)
     
+    if st.session_state.score_results:
+        selected_sources = select_sources_for_synthesis(st.session_state.score_results)
+        if selected_sources:
+            with st.expander("View raw extracted content from candidate synthesis sources"):
+                for i, item in enumerate(selected_sources):
+                    source = item['source']
+                    sc = item['score']
+                    st.markdown(f"**{i+1}. {source.get('title', 'Untitled')}**")
+                    st.caption(
+                        f"{source.get('url', '')} · Relevance {sc['relevance_score']}/10 · Slots {sc['slots_filled']}/5"
+                    )
+                    st.text(source.get('text', '')[:2500] + ("..." if len(source.get('text', '')) > 2500 else ""))
+    
     if st.button("📝 Run Synthesis", key="synthesize_btn"):
         with st.spinner("Synthesizing comprehensive category page..."):
             response = requests.post(f"{API_BASE}/synthesize", json=st.session_state.score_results["scored_sources"])
@@ -464,24 +484,28 @@ if st.session_state.workflow_step >= 4:
         st.markdown("---")
         
         sections = [
-            ("1. DEFINITION", synthesis['definition']),
-            ("2. CORE CAPABILITIES", "\n".join(f"• {cap}" for cap in synthesis['core_capabilities'])),
-            ("3. BOUNDARIES", synthesis['boundaries']),
-            ("4. BUYER / USE CASE", synthesis['buyer_use_case']),
-            ("5. REPRESENTATIVE VENDORS", "\n".join(f"• {vendor}" for vendor in synthesis['representative_vendors'])),
-            ("6. MARKET OVERVIEW", synthesis['market_overview']),
-            ("7. IMPLEMENTATION CONSIDERATIONS", synthesis['implementation_considerations']),
-            ("8. VENDOR LANDSCAPE", synthesis['vendor_landscape']),
-            ("9. FUTURE TRENDS", synthesis['future_trends']),
-            ("10. INTEGRATION POINTS", synthesis['integration_points']),
-            ("11. SUCCESS METRICS", synthesis['success_metrics']),
-            ("12. COMMON CHALLENGES", synthesis['common_challenges']),
-            ("13. CATEGORY DRIFT / ANALYST DISAGREEMENT", synthesis['category_drift']),
+            ("1. DEFINITION", synthesis['definition'], False),
+            ("2. CORE CAPABILITIES", synthesis['core_capabilities'], True),
+            ("3. BOUNDARIES", synthesis['boundaries'], False),
+            ("4. BUYER / USE CASE", synthesis['buyer_use_case'], False),
+            ("5. REPRESENTATIVE VENDORS", synthesis['representative_vendors'], True),
+            ("6. MARKET OVERVIEW", synthesis['market_overview'], False),
+            ("7. IMPLEMENTATION CONSIDERATIONS", synthesis['implementation_considerations'], False),
+            ("8. VENDOR LANDSCAPE", synthesis['vendor_landscape'], False),
+            ("9. FUTURE TRENDS", synthesis['future_trends'], False),
+            ("10. INTEGRATION POINTS", synthesis['integration_points'], False),
+            ("11. SUCCESS METRICS", synthesis['success_metrics'], False),
+            ("12. COMMON CHALLENGES", synthesis['common_challenges'], False),
+            ("13. CATEGORY DRIFT / ANALYST DISAGREEMENT", synthesis['category_drift'], False),
         ]
         
-        for section_title, section_content in sections:
+        for section_title, section_content, is_list in sections:
             with st.expander(section_title):
-                st.markdown(section_content)
+                if is_list and isinstance(section_content, list):
+                    for item in section_content:
+                        st.markdown(f"• {item}")
+                else:
+                    st.markdown(section_content)
         
         with st.expander("View Raw Synthesis JSON"):
             st.json(synthesis)

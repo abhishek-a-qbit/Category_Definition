@@ -10,7 +10,7 @@ import json
 import pathlib
 import time
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Tuple
 from urllib.parse import urlparse
 
@@ -235,6 +235,14 @@ def source_age_months(date_str: str) -> Optional[int]:
     except (ValueError, TypeError):
         return None
 
+
+def build_serper_date_filter(max_age_months: int) -> str:
+    if not max_age_months or max_age_months <= 0:
+        return ""
+    cutoff = datetime.now() - timedelta(days=int(max_age_months * 30.44))
+    return f"after:{cutoff.strftime('%Y-%m-%d')}"
+
+
 def serper_search(query: str, api_key: str, num: int = 10, **kwargs) -> List[Dict]:
     cached = cache_get("serper", query, num, kwargs)
     if cached is not None:
@@ -318,7 +326,7 @@ VENDOR_TITLE_PATTERNS = [
 ]
 
 # Post-scrape: only reject broken/empty fetches. Semantic quality is handled by LLM scoring.
-MIN_SCRAPED_TEXT_LEN = 150
+MIN_SCRAPED_TEXT_LEN = 100  # Reduced to 100 chars to capture concise expert content (e.g., analyst blog posts)
 MIN_TITLE_LEN = 10
 
 
@@ -357,19 +365,22 @@ def should_scrape_url(url: str, title: str, search_pass: str) -> Tuple[bool, str
 
 def should_keep_scraped_content(article: Dict, max_age_months: int) -> Tuple[bool, str]:
     """
-    Post-scrape gate: only drop pages that failed to fetch or have no usable text.
+    Post-scrape gate: drop pages that failed to fetch, have no usable text, or are too old.
 
-    Age, byline, and marketing quality are deferred to LLM scoring (which already
-    receives date, author, and full text) so synthesis still receives candidates.
+    Age is enforced here strictly because search filters are best-effort and may miss older results.
     """
-    del max_age_months  # reserved for scoring prompt / future soft warnings
-
     if not article or "_error" in article:
         return False, f"SCRAPE_ERROR: {article.get('_error', 'unknown')}"
 
     text = article.get("text", "")
     if not text or len(text.strip()) < MIN_SCRAPED_TEXT_LEN:
         return False, f"TOO_SHORT: {len(text)} chars"
+
+    age = source_age_months(article.get("date"))
+    if age is None:
+        return False, "UNKNOWN_DATE"
+    if age >= max_age_months:
+        return False, f"TOO_OLD: {age} months"
 
     return True, "PASS"
 
@@ -384,11 +395,60 @@ _EXCLUDED_VENDOR_TERMS = frozenset({
 _GENERIC_VENDOR_PHRASES = (
     "marketing technology",
     "marketing automation",
-    "data provider",
+    "customer data platform",
+    "customer data platforms",
+    "cdp",
+    "demand generation",
+    "sales enablement",
+    "intent data",
+    "account intelligence",
+    "buyer intent",
+    "pipeline management",
+    "demand orchestration",
+    "account-based experience",
+    "account-based everything",
+    "b2b marketing",
     "account-based marketing platform",
     "abm platform",
-    "b2b marketing",
+    "marketing orchestration",
+    "analytics platform",
+    "marketing analytics",
+    "account-based marketing",
+    "lead generation",
+    "lead scoring",
+    "customer experience",
+    "customer engagement",
+    "revenue operations",
+    "predictive analytics",
+    "sales and marketing alignment",
+    "target account",
+    "account engagement",
+    "demand gen",
 )
+_GENERIC_VENDOR_TOKENS = frozenset({
+    "platform", "software", "solution", "service", "services",
+    "technology", "technologies", "automation", "analytics", "management",
+    "system", "systems", "stack", "suite", "engine", "tool", "tools",
+})
+
+
+def is_generic_vendor_label(name: str) -> bool:
+    lower = name.lower().strip()
+    if not lower:
+        return True
+    if lower in _EXCLUDED_VENDOR_TERMS:
+        return True
+    if any(phrase in lower for phrase in _GENERIC_VENDOR_PHRASES):
+        return True
+    if any(token in lower for token in _GENERIC_VENDOR_TOKENS) and any(
+        cat in lower for cat in (
+            "marketing", "account-based", "b2b", "demand", "intent",
+            "sales", "customer", "analytics", "data", "campaign",
+            "orchestration", "experience", "platform",
+        )
+    ):
+        return True
+    return False
 
 
 def sanitize_vendor_names(names: List[str]) -> List[str]:
@@ -400,10 +460,7 @@ def sanitize_vendor_names(names: List[str]) -> List[str]:
             continue
         if _PLACEHOLDER_VENDOR.match(name):
             continue
-        lower = name.lower()
-        if lower in _EXCLUDED_VENDOR_TERMS:
-            continue
-        if any(phrase in lower for phrase in _GENERIC_VENDOR_PHRASES):
+        if is_generic_vendor_label(name):
             continue
         out.append(name)
     seen: set = set()
@@ -635,16 +692,17 @@ async def search_sources():
     total_blocked = 0
     
     # Pass 1: Tier 1 primary aliases
-    def run_search_pass(name: str, sites: List[str], aliases: List[str], batch_size: int, num_per_query: int = 6):
+    def run_search_pass(name: str, sites: List[str], aliases: List[str], batch_size: int, num_per_query: int = 10):
         nonlocal total_queries
         batches = batch_site_queries(sites, batch_size=batch_size)
         queries_run = 0
         hits_added = 0
         blocked = 0
         
+        date_filter = build_serper_date_filter(MAX_SOURCE_AGE_MONTHS)
         for alias in aliases:
             for site_clause in batches:
-                query = f'{site_clause} "{alias}" {SERPER_EXCLUSIONS}'
+                query = f'{site_clause} "{alias}" {date_filter} {SERPER_EXCLUSIONS}'.strip()
                 queries_run += 1
                 
                 try:
@@ -694,34 +752,19 @@ async def search_sources():
         
         "note": (
             "search_blocked_at_search uses DROP_URL_PATTERNS only. "
-            "Pre-scrape applies NON_CONTENT, title, and Tier2 rules. "
-            "Post-scrape keeps all successful fetches with >=150 chars for scoring."
+            "Search queries also include a date filter to restrict results to sources younger than the configured max source age. "
+            "There is no pre-scrape filtering in the current workflow. "
+            "Post-scrape keeps all successful fetches with >=100 chars for scoring."
         ),
     }
 
 @app.post("/scrape")
 async def scrape_sources(search_results: List[SearchResult]):
     """Step 2: Scrape content from search results"""
-    filtered_for_scraping = []
-    pre_scrape_filtered = []
-    
-    for result in search_results:
-        should_scrape, reason = should_scrape_url(result.url, result.title, result.search_pass)
-        
-        if should_scrape:
-            filtered_for_scraping.append(result)
-        else:
-            pre_scrape_filtered.append({
-                "url": result.url,
-                "title": result.title,
-                "reason": reason,
-                "search_pass": result.search_pass
-            })
-    
     scraped_sources = []
     scrape_failures = []
     
-    for result in filtered_for_scraping:
+    for result in search_results:
         article = extract_article(result.url)
         
         should_keep, keep_reason = should_keep_scraped_content(article, MAX_SOURCE_AGE_MONTHS)
@@ -738,30 +781,19 @@ async def scrape_sources(search_results: List[SearchResult]):
         
         time.sleep(SCRAPE_DELAY)
 
-    pre_scrape_breakdown: Dict[str, int] = {}
-    for item in pre_scrape_filtered:
-        key = item["reason"].split(":")[0]
-        pre_scrape_breakdown[key] = pre_scrape_breakdown.get(key, 0) + 1
-
     post_scrape_breakdown: Dict[str, int] = {}
     for item in scrape_failures:
         key = item["reason"].split(":")[0]
         post_scrape_breakdown[key] = post_scrape_breakdown.get(key, 0) + 1
 
-    
-
     return {
         "original_count": len(search_results),
-        "pre_scrape_filtered": len(pre_scrape_filtered),
-        "pre_scrape_breakdown": pre_scrape_breakdown,
-        "attempted_scrape": len(filtered_for_scraping),
+        "attempted_scrape": len(search_results),
         "successfully_scraped": len(scraped_sources),
         "post_scrape_filtered": len(scrape_failures),
         "post_scrape_breakdown": post_scrape_breakdown,
         "scraped_sources": scraped_sources,
-        "pre_scrape_details": pre_scrape_filtered[:10],
         "scrape_failures": scrape_failures[:10]
-        
     }
 
 
@@ -819,18 +851,20 @@ async def score_sources(sources: List[ScrapedSource]):
     SCORING_PROMPT = ChatPromptTemplate.from_messages([
         ("system", """You are evaluating a web source for its usefulness in defining the software category "{category}".
 
+**IMPORTANT**: Expert analyst content is often CONCISE. Brief, high-quality expert writing is superior to lengthy marketing fluff. Do NOT penalize sources for brevity.
+
 CRITICAL FIRST CHECK: Determine whether the scraped content MAINLY talks about the category "{category}".
 - Read the full content carefully. Is the primary subject matter actually about "{category}"?
 - If the content is about a different topic, a different software category, or only mentions "{category}" tangentially, it is NOT relevant.
 - If the content does NOT mainly discuss "{category}", you MUST set relevance_score to 0-2 (low) and explain in reasoning why it's not relevant.
 
 After the category relevance check, score on these criteria:
-1. SLOT-FILL: Does it contain (a) a definition, (b) core capabilities, (c) boundaries vs adjacent categories, (d) buyer/use case, (e) representative vendors? Count how many of these 5 slots it fills.
+1. SLOT-FILL: Does it contain (a) a definition, (b) core capabilities, (c) boundaries vs adjacent categories, (d) buyer/use case, (e) representative vendors? Count how many of these 5 slots it fills. A brief but clear explanation of each slot is valuable; length does not determine slot quality.
 2. FUNCTION-VERBS: Does it use expert verbs (orchestrate, unify, score, route, match, segment, personalize, align) rather than SEO adjectives?
 3. BYLINE QUALITY: Evaluate the author byline - "named_analyst", "named_author", or "no_byline".
-4. CATEGORY VENDORS: Extract ONLY companies that sell software/platforms in the "{category}" category (named in the article as vendors/products in THAT category). Use exact company names from the text. EXCLUDE: placeholders (Vendor 1, Vendor 2), social/ad channels (LinkedIn, Meta, TikTok, Reddit, Google), generic labels (programmatic display), and vendors from adjacent categories (CRM, ERP, MAP) unless the article explicitly lists them as "{category}" platform vendors. If none are named for this category, return vendor_names: [] and vendor_count: 0.
-5. SME CONTENT: Is this analyst/expert content or marketing fluff?
-6. RELEVANCE: How useful is this {category} source (1-10)? This should be LOW (0-2) if the content does not mainly discuss "{category}".
+4. CATEGORY VENDORS: Extract ONLY companies that sell software/platforms in the "{category}" category (named in the article as vendors/products in THAT category). Use exact company names from the text. Do NOT return generic categories, product types, software labels, or non-vendor descriptions such as "marketing automation", "customer data platform", "ABM platform", "account-based experience", "demand orchestration", "analytics platform", or "lead management solution". EXCLUDE: placeholders (Vendor 1, Vendor 2), social/ad channels (LinkedIn, Meta, TikTok, Reddit, Google), generic labels (programmatic display), and vendors from adjacent categories (CRM, ERP, MAP) unless the article explicitly lists them as "{category}" platform vendors. If none are named for this category, return vendor_names: [] and vendor_count: 0.
+5. SME CONTENT: Is this analyst/expert content or marketing fluff? Analyst blogs and concise expert commentary = SME content. Marketing-heavy product comparison pages = not SME.
+6. RELEVANCE: How useful is this {category} source (1-10)? Score based on RELEVANCE and SLOT-FILL quality, NOT content length. A 2-paragraph expert source with 3-4 slots filled should score 7-9, not 2-3. A 50-paragraph marketing page with 1 slot should score 3-4.
 
 Return valid JSON matching the schema."""),
         ("human", """Source URL: {url}
@@ -850,8 +884,21 @@ Content (first 3000 chars):
     
     scored_sources = []
     cache_hits = 0
-    
-    for i, s in enumerate(sources):
+    skipped_due_to_age = 0
+    skipped_unknown_date = 0
+    filtered_sources = []
+
+    for s in sources:
+        age = source_age_months(s.date)
+        if age is None:
+            skipped_unknown_date += 1
+            continue
+        if age >= MAX_SOURCE_AGE_MONTHS:
+            skipped_due_to_age += 1
+            continue
+        filtered_sources.append(s)
+
+    for i, s in enumerate(filtered_sources):
         text_trunc = s.text[:3000]
         age = source_age_months(s.date)
         age_str = f"{age} months" if age is not None else "unknown"
@@ -900,6 +947,8 @@ Content (first 3000 chars):
         "total_scored": len(scored_sources),
         "cache_hits": cache_hits,
         "new_llm_calls": len(scored_sources) - cache_hits,
+        "skipped_due_to_age": skipped_due_to_age,
+        "skipped_unknown_date": skipped_unknown_date,
         "scored_sources": scored_sources,
     }
 
@@ -957,18 +1006,23 @@ Content: {s['text'][:SYNTHESIS_CONTENT_CHARS]}...
     COMPREHENSIVE_SYNTHESIS_PROMPT = ChatPromptTemplate.from_messages([
         ("system", """You are writing an extremely comprehensive category definition page that reads like a definitive industry report. The page must be written in editorial voice — no direct quotation from sources. Multi-source consensus carries definition.
 
+IMPORTANT GROUNDING RULES:
+- Use ONLY the facts and details found in the provided source content.
+- Do NOT invent any information, statistics, vendor names, capabilities, use cases, or market analysis that is not directly supported by the source content.
+- Do NOT rely on your outside knowledge of the category. If the source content does not explicitly support something, omit it.
+- If a requested section cannot be supported from the source material, write a concise clearly qualified statement that this section is not fully supported by the provided sources.
+- Use the authoritative vendor list only; do not introduce vendors not included there.
+
 COMPREHENSIVE CONTENT REQUIREMENTS:
-- Each section should be extremely substantial (8-15 paragraphs minimum) with exhaustive details, deep insights, and comprehensive analysis
-- Use abundant specific examples, vendor names, concrete scenarios, case studies, and real-world applications
-- Provide highly actionable, strategic insights for buyers, implementers, and executives
-- Include quantitative data, market statistics, growth projections, and comparative analysis where possible
-- Structure content with clear subheadings, bullet points, and logical flow for easy consumption
-- Aim for 3000-5000+ words total for the complete category page
+- Each section should be grounded in evidence from the source text.
+- Prefer accuracy and faithfulness over length. Do not artificially inflate content just to hit a word count.
+- Structure content with clear subheadings, bullet points, and logical flow for easy consumption.
+- Use examples and vendors only when they are explicitly supported by the source text.
 
 DETAILED SECTION REQUIREMENTS:
 1. DEFINITION: 4-6 comprehensive paragraphs describing what the SOFTWARE does, its core purpose, evolution, and strategic importance in the modern business landscape.
 
-2. CORE CAPABILITIES: 12-20 detailed capabilities organized into logical categories (strategic, operational, technical, analytical). Each capability should include explanation, benefits, use cases, and implementation considerations using strong function-verbs.
+2. CORE CAPABILITIES: 12-20 separate capability statements. Return core_capabilities as a JSON list of individual capability items. Each list item should be a single capability statement, written clearly and concisely with explanation, benefit, use case, and implementation consideration using strong function verbs. Do not combine multiple capabilities into one paragraph.
 
 3. BOUNDARIES: Exhaustive analysis of adjacent categories with specific examples, detailed comparison matrices, clear differentiation criteria, and guidance on when to choose this category vs alternatives.
 
@@ -1001,6 +1055,8 @@ AUTHORITATIVE VENDOR LIST for "{category}" (extracted from sources below — use
 
 Sources:
 {sources_text}
+
+Use only the content provided above. Do not add material from outside knowledge.
 
 Synthesize an extraordinarily comprehensive category page (aim for 3000-5000+ words total) from these sources, following all the detailed requirements above."""),
     ])
