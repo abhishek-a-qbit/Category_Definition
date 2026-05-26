@@ -175,13 +175,18 @@ if cache_response.status_code == 200:
         st.sidebar.metric(namespace, count)
 
 st.sidebar.markdown("**Clear Cache:**")
-col1, col2 = st.sidebar.columns(2)
+col1, col2, col3 = st.sidebar.columns(3)
 with col1:
-    if st.button("🗑️ LLM", help="Clear LLM scoring cache only"):
+    if st.button("🗑️ Scoring", help="Clear LLM scoring cache only"):
         requests.delete(f"{API_BASE}/cache", params={"namespace": "llm_scoring"})
-        st.sidebar.success("LLM cache cleared!")
+        st.sidebar.success("Scoring cache cleared!")
         st.rerun()
 with col2:
+    if st.button("🗑️ Synthesis", help="Clear LLM synthesis cache only"):
+        requests.delete(f"{API_BASE}/cache", params={"namespace": "llm_synthesis"})
+        st.sidebar.success("Synthesis cache cleared!")
+        st.rerun()
+with col3:
     if st.button("🗑️ All", help="Clear all cache"):
         requests.delete(f"{API_BASE}/cache")
         st.sidebar.success("All cache cleared!")
