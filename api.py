@@ -376,6 +376,12 @@ def should_keep_scraped_content(article: Dict, max_age_months: int) -> Tuple[boo
     if not text or len(text.strip()) < MIN_SCRAPED_TEXT_LEN:
         return False, f"TOO_SHORT: {len(text)} chars"
 
+    # Drop obvious non-content pages such as author profile pages or hub/listing pages
+    url = (article.get("url") or "").lower()
+    for pattern in NON_CONTENT_URL_PATTERNS:
+        if pattern in url:
+            return False, f"NON_CONTENT_URL_PATTERN: {pattern}"
+
     age = source_age_months(article.get("date"))
     if age is None:
         return False, "UNKNOWN_DATE"
