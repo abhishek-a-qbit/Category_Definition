@@ -243,7 +243,7 @@ def build_serper_date_filter(max_age_months: int) -> str:
     return f"after:{cutoff.strftime('%Y-%m-%d')}"
 
 
-def serper_search(query: str, api_key: str, num: int = 10, **kwargs) -> List[Dict]:
+def serper_search(query: str, api_key: str, num: int = 15, **kwargs) -> List[Dict]:
     cached = cache_get("serper", query, num, kwargs)
     if cached is not None:
         return cached
@@ -698,7 +698,7 @@ async def search_sources():
     total_blocked = 0
     
     # Pass 1: Tier 1 primary aliases
-    def run_search_pass(name: str, sites: List[str], aliases: List[str], batch_size: int, num_per_query: int = 10):
+    def run_search_pass(name: str, sites: List[str], aliases: List[str], batch_size: int, num_per_query: int = 15):
         nonlocal total_queries
         batches = batch_site_queries(sites, batch_size=batch_size)
         queries_run = 0
@@ -857,22 +857,25 @@ async def score_sources(sources: List[ScrapedSource]):
     SCORING_PROMPT = ChatPromptTemplate.from_messages([
         ("system", """You are evaluating a web source for its usefulness in defining the software category "{category}".
 
-**IMPORTANT**: Expert analyst content is often CONCISE. Brief, high-quality expert writing is superior to lengthy marketing fluff. Do NOT penalize sources for brevity.
+    IMPORTANT: Expert analyst content is often CONCISE. Brief, high-quality expert writing is superior to lengthy marketing fluff. Do NOT penalize sources purely for brevity.
 
-CRITICAL FIRST CHECK: Determine whether the scraped content MAINLY talks about the category "{category}".
-- Read the full content carefully. Is the primary subject matter actually about "{category}"?
-- If the content is about a different topic, a different software category, or only mentions "{category}" tangentially, it is NOT relevant.
-- If the content does NOT mainly discuss "{category}", you MUST set relevance_score to 0-2 (low) and explain in reasoning why it's not relevant.
+    CRITICAL FIRST CHECK (RELEVANCE vs NON-CONTENT): Before scoring, determine whether the scraped page is actually about the category "{category}", or if it is an author profile, author listing/hub, tag archive, or other non-article page.
+    - If the page is an author/profile page (contains obvious author-bio language such as "about the author", "bio", "view all posts by", social/contact links, or the content focuses on the author's background rather than the topic), OR the page is a listing/hub that primarily links to other posts, you MUST set `relevance_score` to 0-2 and explain why (label the reason in `reasoning`).
+    - Heuristics you SHOULD use to identify non-content author/profile pages:
+      - Presence of phrases like "about the author", "author bio", "bio", "view all posts by", "follow me on", "contact the author".
+      - URL contains "/author/" or clearly indicates a profile/listing.
+      - Page contains mostly links to other posts, social links, or short personal paragraphs about the author with little to no topical exposition.
+      - Extracted text length is very short and focused on personal background or credentials rather than substantive discussion of the category.
 
-After the category relevance check, score on these criteria:
-1. SLOT-FILL: Does it contain (a) a definition, (b) core capabilities, (c) boundaries vs adjacent categories, (d) buyer/use case, (e) representative vendors? Count how many of these 5 slots it fills. A brief but clear explanation of each slot is valuable; length does not determine slot quality.
-2. FUNCTION-VERBS: Does it use expert verbs (orchestrate, unify, score, route, match, segment, personalize, align) rather than SEO adjectives?
-3. BYLINE QUALITY: Evaluate the author byline - "named_analyst", "named_author", or "no_byline".
-4. CATEGORY VENDORS: Extract ONLY companies that sell software/platforms in the "{category}" category (named in the article as vendors/products in THAT category). Use exact company names from the text. Do NOT return generic categories, product types, software labels, or non-vendor descriptions such as "marketing automation", "customer data platform", "ABM platform", "account-based experience", "demand orchestration", "analytics platform", or "lead management solution". EXCLUDE: placeholders (Vendor 1, Vendor 2), social/ad channels (LinkedIn, Meta, TikTok, Reddit, Google), generic labels (programmatic display), and vendors from adjacent categories (CRM, ERP, MAP) unless the article explicitly lists them as "{category}" platform vendors. If none are named for this category, return vendor_names: [] and vendor_count: 0.
-5. SME CONTENT: Is this analyst/expert content or marketing fluff? Analyst blogs and concise expert commentary = SME content. Marketing-heavy product comparison pages = not SME.
-6. RELEVANCE: How useful is this {category} source (1-10)? Score based on RELEVANCE and SLOT-FILL quality, NOT content length. A 2-paragraph expert source with 3-4 slots filled should score 7-9, not 2-3. A 50-paragraph marketing page with 1 slot should score 3-4.
+    After ruling out author/profile/listing pages, proceed to score on these criteria (use the content as evidence):
+    1. SLOT-FILL: Does it contain (a) a definition, (b) core capabilities, (c) boundaries vs adjacent categories, (d) buyer/use case, (e) representative vendors? Count how many of these 5 slots it fills. Brief but clear statements count fully; do not equate length with quality.
+    2. FUNCTION-VERBS: Does it use expert verbs (orchestrate, unify, score, route, match, segment, personalize, align) rather than marketing buzzwords?
+    3. BYLINE QUALITY: Evaluate the author byline - return exactly one of "named_analyst", "named_author", or "no_byline". If the page is an author profile (see heuristics above), still set byline appropriately but mark relevance low.
+    4. CATEGORY VENDORS: Extract ONLY companies that are explicitly named as vendors/products in the context of the "{category}". Use exact names from the text and EXCLUDE generic labels, placeholders, ad/social channels, and vendors obviously from adjacent categories unless explicitly presented as "{category}" vendors.
+    5. SME CONTENT: Is this analyst/expert content or marketing fluff? Analyst commentary and concise expert analysis = SME content.
+    6. RELEVANCE: Overall usefulness to define the category (1-10). Base this primarily on SLOT-FILL and SME quality, not raw word count. If the content is an author/profile page or listing, set 0-2.
 
-Return valid JSON matching the schema."""),
+    RETURN: If the content is not primarily about "{category}", you MUST give `relevance_score` 0-2 and explain the reasoning succinctly. Otherwise, produce scores and a short `reasoning` field showing the evidence (which slots were found and why). Return valid JSON matching the schema."""),
         ("human", """Source URL: {url}
 Title: {title}
 Author: {author}
